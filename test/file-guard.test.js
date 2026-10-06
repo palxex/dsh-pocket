@@ -17,6 +17,20 @@ test('fileGuard 只依赖稳定结构（button/a + 路径文案），不依赖 h
   assert.ok(!/\[class[*^$]?=/.test(src), 'fileGuard.ts 的检测不能出现 class 属性选择器（hash 类名每次构建都变）');
 });
 
+test('fileGuard 豁免菜单/选择器 UI：模型行文案是模型 ID，不能被当文件链接', () => {
+  // 模型选择器（dsh-client-ui-model-selection）触发按钮带 aria-haspopup="menu"，
+  // 各行是 role="menuitemradio"/"menuitem"，文案就是模型 ID（如 z-ai/glm-5.3）——
+  // 与文件路径（lib/proxy.mjs）在文本上无法区分，必须按 ARIA 上下文豁免，
+  // 否则模型点选被拦截（误弹「手机上无法直接打开电脑上的文件」）、行旁被注入复制按钮。
+  assert.ok(src.includes('function isMenuUi'), '必须先判断元素是否位于菜单/选择器 UI 内');
+  assert.ok(src.includes('[role="menuitemradio"]'), '豁免必须覆盖菜单单选项（模型行、推理力度行）');
+  assert.ok(src.includes('[role="menuitem"]'), '豁免必须覆盖菜单项（根面板单元格）');
+  assert.ok(src.includes('[aria-haspopup="menu"]'), '豁免必须覆盖菜单触发按钮');
+  // 点击拦截与复制按钮注入都要先过 isMenuUi，再看文本像不像路径
+  assert.ok(/if \(isMenuUi\(el\)\) return\n    if \(!looksLikeFilePath/.test(src), '点击拦截必须先豁免菜单 UI');
+  assert.ok(/if \(isMenuUi\(el\)\) return\n      const txt/.test(src), '复制按钮注入必须先豁免菜单 UI');
+});
+
 test('mobile-apply 已接线 startFileGuard（窄屏生效、传入 readFile，且不再接 fileCopy）', () => {
   assert.ok(apply.includes("import { startFileGuard } from './fileGuard.ts'"), '必须 import 模块');
   assert.ok(apply.includes('startFileGuard(readFile)'), '必须调用 startFileGuard 并传入 readFile 回调');
@@ -43,6 +57,8 @@ test('打包产物含守卫 + 复制按钮结构标记', () => {
   // 复制按钮：注入标记 + 经 RPC 读文件（data-mobile-nav-copy 标记已处理链接，避免重复注入）
   assert.ok(bundle.includes('copy-file'), '产物必须含复制按钮标记 data-mobile-nav="copy-file"');
   assert.ok(bundle.includes('data-mobile-nav-copy'), '产物必须用标记避免重复注入复制按钮');
+  // 菜单 UI 豁免：模型选择器等菜单里的按钮文案是模型 ID，不能被当文件链接
+  assert.ok(bundle.includes('isMenuUi'), '产物必须含菜单 UI 豁免逻辑——先跑 node client/build.mjs');
 });
 
 test('CSS 隐藏「添加工作区」图标 + 复制按钮样式（窄屏）', () => {

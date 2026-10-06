@@ -419,6 +419,18 @@ function looksLikeFilePath(text) {
   if (/[\w.\-]+\/[\w.\-]+\.\w{1,12}/.test(t)) return true;
   return false;
 }
+var MENU_UI_SELECTOR = [
+  '[role="menu"]',
+  '[role="menuitem"]',
+  '[role="menuitemradio"]',
+  '[role="menuitemcheckbox"]',
+  '[role="listbox"]',
+  '[role="option"]',
+  '[aria-haspopup="menu"]'
+].join(",");
+function isMenuUi(el) {
+  return el.closest(MENU_UI_SELECTOR) !== null;
+}
 async function copyText(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -486,6 +498,7 @@ function startFileGuard(readFile) {
     if (target === null) return;
     const el = target.closest("button, a");
     if (el === null) return;
+    if (isMenuUi(el)) return;
     if (!looksLikeFilePath(el.textContent)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -496,6 +509,7 @@ function startFileGuard(readFile) {
     const links = document.querySelectorAll("button, a");
     links.forEach((el) => {
       if (el.getAttribute("data-mobile-nav-copy") === "1") return;
+      if (isMenuUi(el)) return;
       const txt = (el.textContent ?? "").trim();
       if (!looksLikeFilePath(txt)) return;
       el.setAttribute("data-mobile-nav-copy", "1");

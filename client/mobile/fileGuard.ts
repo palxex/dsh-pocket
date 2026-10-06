@@ -33,6 +33,26 @@ function looksLikeFilePath(text: string | null): boolean {
   return false
 }
 
+// 菜单 / 下拉 / 选项列表类 UI 一律不算文件链接：模型选择器触发按钮带
+// aria-haspopup="menu"，各行是 role="menuitemradio"/"menuitem"（面板
+// role="menu"/"group"），而行文案就是模型 ID（如 z-ai/glm-5.3）——会被
+// looksLikeFilePath 误判成文件路径，导致模型点选被拦截、旁边被注入
+// 「复制」按钮。凡位于这类 UI 内的元素直接跳过。
+const MENU_UI_SELECTOR = [
+  '[role="menu"]',
+  '[role="menuitem"]',
+  '[role="menuitemradio"]',
+  '[role="menuitemcheckbox"]',
+  '[role="listbox"]',
+  '[role="option"]',
+  '[aria-haspopup="menu"]',
+].join(',')
+
+/** 元素是否位于菜单 / 选择器 UI 内（模型选择器、推理力度菜单等）。 */
+function isMenuUi(el: Element): boolean {
+  return el.closest(MENU_UI_SELECTOR) !== null
+}
+
 /** 写剪贴板：优先 navigator.clipboard，非安全上下文（局域网 http）回退 execCommand。 */
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -107,6 +127,7 @@ export function startFileGuard(
     if (target === null) return
     const el = target.closest('button, a') as HTMLElement | null
     if (el === null) return
+    if (isMenuUi(el)) return
     if (!looksLikeFilePath(el.textContent)) return
     event.preventDefault()
     event.stopImmediatePropagation()
@@ -121,6 +142,7 @@ export function startFileGuard(
     const links = document.querySelectorAll('button, a')
     links.forEach((el) => {
       if (el.getAttribute('data-mobile-nav-copy') === '1') return
+      if (isMenuUi(el)) return
       const txt = (el.textContent ?? '').trim()
       if (!looksLikeFilePath(txt)) return
       el.setAttribute('data-mobile-nav-copy', '1')

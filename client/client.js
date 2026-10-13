@@ -1899,9 +1899,6 @@ var zh2 = {
   "section": "\u624B\u673A\u8BBF\u95EE",
   "title": "\u{1F4F1} \u624B\u673A\u8BBF\u95EE",
   "subtitle": "\u624B\u673A\u626B\u7801\u6253\u5F00\u7684\u5C31\u662F\u7535\u8111\u4E0A\u7684\u8FD9\u4E2A\u754C\u9762\uFF0C\u5B9E\u65F6\u540C\u6B65",
-  "developer": "\u5F00\u53D1\u8005\uFF1A\u7A0B\u5E8F\u5458\u5C11\u5317\u6668",
-  "starAsk": "\u2B50 \u987A\u624B\u7559\u9897 Star\uFF0C\u4F5C\u8005\u80FD\u9AD8\u5174\u4E00\u6574\u5929",
-  "starCta": "\u884C\uFF0C\u7ED9\u4F60\u4E00\u9897 Star",
   "restarted": "\u{1F504} \u5DF2\u91CD\u542F",
   "ok": "\u77E5\u9053\u4E86",
   "bgHint": "\u8FDB\u7A0B\u5728\u540E\u53F0\u8FD0\u884C\uFF08\u4E0D\u6302\u7EC8\u7AEF\uFF09\u3002\u5982\u9700\u505C\u6B62\uFF1A{cmd}",
@@ -1990,16 +1987,12 @@ var zh2 = {
   "connecting": "\u23F3 \u8FDE\u63A5 Cloudflare \u8FB9\u7F18\uFF08\u901A\u5E38 5-30 \u79D2\uFF09\xB7 \u5DF2\u7B49\u5F85 {s} \u79D2{suffix}",
   "slowHint": " \u2014 \u6709\u70B9\u4E45\uFF1F\u68C0\u67E5\u662F\u5426\u5F00\u7740\u4EE3\u7406/VPN\uFF08Clash TUN \u7B49\uFF09",
   "error": "\u274C \u5F00\u542F\u5931\u8D25\uFF1A{detail}\uFF08\u53EF\u91CD\u8BD5\uFF1B\u82E5\u662F\u4EE3\u7406/VPN \u95EE\u9898\u89C1 README \u6392\u969C\uFF09",
-  "unknownError": "\u672A\u77E5\u9519\u8BEF",
-  "feedback": "\u6709\u95EE\u9898\uFF1F\u6B22\u8FCE\u5230 GitHub Issues \u53CD\u9988 \u{1F64F}"
+  "unknownError": "\u672A\u77E5\u9519\u8BEF"
 };
 var en2 = {
   "section": "Phone access",
   "title": "\u{1F4F1} Phone access",
   "subtitle": "The phone shows this exact screen, live",
-  "developer": "Developer: \u5C11\u5317\u6668 (shaobeichen)",
-  "starAsk": "\u2B50 Drop a Star if it helped \u2014 it makes the author\u2019s day",
-  "starCta": "\u2605 Give a Star",
   "restarted": "\u{1F504} Restarted",
   "ok": "Got it",
   "bgHint": "Running in the background (not attached to a terminal). To stop: {cmd}",
@@ -2088,8 +2081,7 @@ var en2 = {
   "connecting": "\u23F3 Connecting to Cloudflare edge (usually 5-30s) \xB7 {s}s elapsed{suffix}",
   "slowHint": " \u2014 taking long? Check for a proxy/VPN (e.g., Clash TUN)",
   "error": "\u274C Failed to enable: {detail} (you can retry; for proxy/VPN issues see the README)",
-  "unknownError": "unknown error",
-  "feedback": "\u{1F64F} Questions? Open an issue on GitHub"
+  "unknownError": "unknown error"
 };
 
 // client/index.jsx
@@ -2455,17 +2447,6 @@ function PocketSettingsTab({ rpcCall, t }) {
         null,
         (0, import_react2.createElement)("strong", null, t("title")),
         (0, import_react2.createElement)("div", { style: styles.muted }, t("subtitle"))
-      ),
-      (0, import_react2.createElement)(
-        "div",
-        { style: { fontSize: 12, color: "var(--dsw-alias-label-tertiary,#8b93a1)", textAlign: "right" } },
-        (0, import_react2.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("developer")),
-        (0, import_react2.createElement)("div", { style: { whiteSpace: "nowrap" } }, t("starAsk")),
-        (0, import_react2.createElement)(
-          "a",
-          { href: "https://github.com/shaobeichen/dsh-pocket", target: "_blank", rel: "noreferrer", style: { color: "var(--dsw-alias-brand-primary,#4f6ef7)", fontSize: 12, lineHeight: 1.6, textDecoration: "underline" } },
-          t("starCta")
-        )
       )
     ),
     // 桌面端不显示更新/重启横幅（更新由 DSH Desktop 管理），也不需要额外提示
@@ -2760,17 +2741,7 @@ function PocketSettingsTab({ rpcCall, t }) {
         ),
         !disclaimerChecked ? (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } }, t("disclaimerHint")) : null
       )
-    ) : null,
-    // 页面最底部：反馈入口
-    (0, import_react2.createElement)(
-      "div",
-      { style: { ...styles.block, textAlign: "center" } },
-      (0, import_react2.createElement)(
-        "a",
-        { href: "https://github.com/shaobeichen/dsh-pocket/issues", target: "_blank", rel: "noreferrer", style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", textDecoration: "none" } },
-        t("feedback")
-      )
-    )
+    ) : null
   );
 }
 function apply(ctx) {

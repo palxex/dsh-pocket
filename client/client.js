@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: "dsh-pocket",
+  id: "@palxex/dsh-pocket",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;

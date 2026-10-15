@@ -70,3 +70,28 @@ test('bundle 身份三处一致：package.json name / patch name / 目录名约�
     }
   }
 });
+
+test('client bundle 的 __ModuleLoader__ id 必须等于包名', () => {
+  // 服务端按包名请求 `<pkg>/client.js`；bundle 以别的 id 注册时客户端会报
+  // `import failed: client-modules: could not load "<pkg>"`，设置页 tab 不出现。
+  // 对照 @palxex/dsh-plugin-mesh：其 id 即完整包名。
+  const bundle = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8');
+  const m = /__ModuleLoader__\s*\.\s*load\s*\(\s*\{\s*id:\s*(["'])(.+?)\1/.exec(bundle);
+  assert.ok(m, 'client/client.js 应含 window.__ModuleLoader__.load({ id: ... })');
+  assert.equal(
+    m[2],
+    pkg.name,
+    `bundle loader id (${m[2]}) 必须等于包名 (${pkg.name})——` +
+      '不一致时客户端报 "could not load" 且设置页 tab 不出现',
+  );
+});
+
+test('build.mjs 的 loader id 由 package.json 推导，不写死旧名', () => {
+  const build = readFileSync(new URL('../client/build.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(
+    build,
+    /DSH_POCKET_CLIENT_ID\s*\?\?\s*['"]dsh-pocket['"]/,
+    'build.mjs 不应把 loader id 兜底写死为旧名 dsh-pocket；应从 package.json.name 推导',
+  );
+  assert.match(build, /pkg\.name/, 'build.mjs 应以 package.json 的 name 作为 loader id 来源');
+});

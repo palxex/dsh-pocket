@@ -1,5 +1,5 @@
 // dsh-pocket 网页客户端打包：client/index.jsx → client/client.js
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -7,7 +7,13 @@ import { build } from 'esbuild';
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(sourceDir, '..');
 const outputPath = resolve(packageRoot, 'client/client.js');
-const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? 'dsh-pocket';
+
+// 客户端模块注册 id **必须等于包名**（对照 @palxex/dsh-plugin-mesh）。
+// 服务端按包名请求 `@palxex/dsh-pocket/client.js`，bundle 若以别的 id 注册，
+// 客户端就会报 `import failed: client-modules: could not load "@palxex/dsh-pocket"`，
+// 设置页 tab 不出现。这里直接从 package.json 读，避免改名时再次漂移。
+const pkg = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
+const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? pkg.name;
 
 const result = await build({
   entryPoints: [resolve(sourceDir, 'index.jsx')],

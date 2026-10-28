@@ -1,5 +1,5 @@
 // dsh-pocket 网页客户端打包：client/index.jsx → client/client.js
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -7,7 +7,10 @@ import { build } from 'esbuild';
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(sourceDir, '..');
 const outputPath = resolve(packageRoot, 'client/client.js');
-const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? 'dsh-pocket';
+// loader id 必须等于包名：DSH 的客户端模块加载器按包名注册/查找，硬编码旧名会让
+// 改名后的包「导入即失败」，整个插件静默不加载（设置页的 tab 直接消失）。
+const pkg = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
+const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? pkg.name;
 
 const result = await build({
   entryPoints: [resolve(sourceDir, 'index.jsx')],

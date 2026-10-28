@@ -7,9 +7,6 @@ export const zh = {
   'section': '手机访问',
   'title': '📱 手机访问',
   'subtitle': '手机扫码打开的就是电脑上的这个界面，实时同步',
-  'developer': '开发者：程序员少北晨',
-  'starAsk': '⭐ 顺手留颗 Star，作者能高兴一整天',
-  'starCta': '行，给你一颗 Star',
   'restarted': '🔄 已重启',
   'ok': '知道了',
   'bgHint': '进程在后台运行（不挂终端）。如需停止：{cmd}',
@@ -99,7 +96,6 @@ export const zh = {
   'slowHint': ' — 有点久？检查是否开着代理/VPN（Clash TUN 等）',
   'error': '❌ 开启失败：{detail}（可重试；若是代理/VPN 问题见 README 排障）',
   'unknownError': '未知错误',
-  'feedback': '有问题？欢迎到 GitHub Issues 反馈 🙏',
 }
 
 /** English dictionary, key-identical to the Chinese source of truth. */
@@ -107,9 +103,6 @@ export const en = {
   'section': 'Phone access',
   'title': '📱 Phone access',
   'subtitle': 'The phone shows this exact screen, live',
-  'developer': 'Developer: 少北晨 (shaobeichen)',
-  'starAsk': '⭐ Drop a Star if it helped — it makes the author’s day',
-  'starCta': '★ Give a Star',
   'restarted': '🔄 Restarted',
   'ok': 'Got it',
   'bgHint': 'Running in the background (not attached to a terminal). To stop: {cmd}',
@@ -199,5 +192,4 @@ export const en = {
   'slowHint': ' — taking long? Check for a proxy/VPN (e.g., Clash TUN)',
   'error': '❌ Failed to enable: {detail} (you can retry; for proxy/VPN issues see the README)',
   'unknownError': 'unknown error',
-  'feedback': '🙏 Questions? Open an issue on GitHub',
 }

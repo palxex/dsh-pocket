@@ -1,5 +1,7 @@
 # dsh-pocket bundle patch（dsh.bundle manifest 要求的加载配置）
 # 单包单插件：装一次，设置页「手机访问」全部功能到位。
+# name 必须与 package.json 的 name 完全一致：cordis 按 name 解析模块，
+# 对不上会整行静默丢弃（无报错），表现为设置页 tab 直接消失。
 - insert:
     - id: dsh-pocket
-      name: dsh-pocket
+      name: "@palxex/dsh-pocket"

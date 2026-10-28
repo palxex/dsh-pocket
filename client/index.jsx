@@ -16,6 +16,11 @@ import { NS as POCKET_NS, zh as POCKET_ZH, en as POCKET_EN } from './pocket-loca
 const name = 'dsh-pocket';
 const inject = ['slots', 'connection', 'layout', 'locale', 'sessionLogDownload'];
 
+// 更新检测的版本真相源：本 fork 仓库 local 分支的 package.json。
+// 用 raw.githubusercontent.com（带 access-control-allow-origin: *），
+// 与安装规格 `github:palxex/dsh-pocket#local` 对齐——装哪份就比对哪份。
+const LATEST_VERSION_URL = 'https://raw.githubusercontent.com/palxex/dsh-pocket/local/package.json';
+
 // 词典在 pocket-locales.js；这里只做「取 key → 替换 {占位符} → 字符串」。
 // 不依赖 DSH t() 的插值能力，避免行为不一致。
 function fmt(t, key, vars) {
@@ -104,19 +109,27 @@ function PocketSettingsTab({ rpcCall, t }) {
     try { sessionStorage.removeItem('dshp-auto-reloaded'); } catch { /* 忽略 */ }
   }, []);
 
-  // 版本检测：host 当前版本 vs npm registry latest（registry 带 CORS *）
+  // 版本检测：host 当前版本 vs 本仓库最新版本
   // 两种情况显示横幅：① 有新版可更新；② 磁盘已更新但进程还是旧代码（重启生效）
-  // cache: 'no-store' —— registry 响应带缓存头，浏览器会缓存旧版本号导致「小版本不提示」
-  // 周期重查（每 5 分钟）：npm registry 的 /latest 走 CDN 边缘缓存，刚发布后打开页面
-  // 可能拿到旧版本号——周期性重查让更新提示在缓存刷新后自动出现，不用重开页面。
+  // cache: 'no-store' —— 响应带缓存头，浏览器会缓存旧版本号导致「小版本不提示」
+  // 周期重查（每 5 分钟）：CDN 边缘缓存可能让刚发布的版本号延迟可见，
+  // 周期性重查让更新提示在缓存刷新后自动出现，不用重开页面。
   // 桌面端（isDesktop）：更新/重启由 DSH Desktop 管理，这里不做版本检测、不显示更新横幅
+  //
+  // 版本真相源 = 本 fork 仓库（@palxex/dsh-pocket），**不是**上游 npm 包。
+  // 早期实现查 `registry.npmjs.org/dsh-pocket/latest`，那是原作者（shaobeichen）的包：
+  // 一旦他发版（如 2.11.0/2.12.0），本插件就会误报「有新版本可更新」，
+  // 点更新还会把作用域包换回上游包、连带把作者的推广 UI 装回来。
+  // 而 @palxex/dsh-pocket 并未发布到 npm（registry 404），所以只能从仓库取。
+  // 读 local 分支的 package.json：与本插件的安装规格
+  // `github:palxex/dsh-pocket#local` 完全一致，装的是哪份就比对哪份。
   useEffect(() => {
     if (isDesktop) return;
     let alive = true;
     const check = async () => {
       try {
         const v = await call(POCKET_ENDPOINTS.version, {});
-        const meta = await (await fetch('https://registry.npmjs.org/dsh-pocket/latest', { cache: 'no-store' })).json();
+        const meta = await (await fetch(LATEST_VERSION_URL, { cache: 'no-store' })).json();
         if (!alive) return;
         const latest = typeof meta?.version === 'string' ? meta.version : null;
         if (latest && v.current && compareVersions(latest, v.current) > 0) {
@@ -397,12 +410,6 @@ function PocketSettingsTab({ rpcCall, t }) {
         h('strong', null, t('title')),
         h('div', { style: styles.muted }, t('subtitle')),
       ),
-      h('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary,#8b93a1)', textAlign: 'right' } },
-        h('div', { style: { whiteSpace: 'nowrap' } }, t('developer')),
-        h('div', { style: { whiteSpace: 'nowrap' } }, t('starAsk')),
-        h('a', { href: 'https://github.com/shaobeichen/dsh-pocket', target: '_blank', rel: 'noreferrer', style: { color: 'var(--dsw-alias-brand-primary,#4f6ef7)', fontSize: 12, lineHeight: 1.6, textDecoration: 'underline' } },
-          t('starCta')),
-      ),
     ),
 
     // 桌面端不显示更新/重启横幅（更新由 DSH Desktop 管理），也不需要额外提示
@@ -644,12 +651,6 @@ function PocketSettingsTab({ rpcCall, t }) {
         !disclaimerChecked ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } }, t('disclaimerHint')) : null,
       ),
     ) : null,
-
-    // 页面最底部：反馈入口
-    h('div', { style: { ...styles.block, textAlign: 'center' } },
-      h('a', { href: 'https://github.com/shaobeichen/dsh-pocket/issues', target: '_blank', rel: 'noreferrer', style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', textDecoration: 'none' } },
-        t('feedback')),
-    ),
   );
 }
 

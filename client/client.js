@@ -2002,6 +2002,7 @@ var zh2 = {
   "updateFailed": "\u274C \u5931\u8D25\uFF1A{err}\uFF08\u624B\u52A8\u66F4\u65B0\uFF1Adsh plugin --profile web update dsh-pocket --latest -w\uFF09",
   "versionRange": "\u5F53\u524D v{cur} \u2192 \u6700\u65B0 v{latest}",
   "wanAccess": "\u516C\u7F51\u8BBF\u95EE",
+  "pinLabel": "\u8BBF\u95EE\u5BC6\u7801",
   "modeLabel": "\u5730\u5740\u6A21\u5F0F",
   "advAddress": "\u9AD8\u7EA7 \xB7 \u624B\u52A8\u9009\u5730\u5740",
   "wanOffHint": "\u5F00\u542F\u540E\u53EF\u4ECE\u4EFB\u4F55\u7F51\u7EDC\u8BBF\u95EE\uFF08\u6BCF\u6B21\u5F00\u542F\u9700\u786E\u8BA4\u514D\u8D23\u58F0\u660E\uFF09",
@@ -2024,12 +2025,19 @@ var zh2 = {
   "confirm": "\u786E\u5B9A",
   "lanAddress": "\u5C40\u57DF\u7F51\u5730\u5740",
   "lanAddressAuto": "\u81EA\u52A8\uFF08\u63A8\u8350\uFF09",
+  "lanPin": "\u5C40\u57DF\u7F51\u8BBF\u95EE\u5BC6\u7801",
   "on": "\u5F00",
   "off": "\u5173",
+  "lanPinValue": "\u{1F510} \u8BBF\u95EE\u5BC6\u7801\uFF1A{pin}\uFF08\u624B\u673A\u6253\u5F00\u9700\u8F93\u5165\uFF1B\u4E0E\u516C\u7F51\u5BC6\u7801\u5206\u5F00\uFF09",
+  "lanPinCustomValue": "\u{1F510} \u8BBF\u95EE\u5BC6\u7801\uFF1A{pin}\uFF08\u81EA\u5B9A\u4E49\uFF1B\u624B\u673A\u6253\u5F00\u9700\u8F93\u5165\uFF09",
   "refresh": "\u5237\u65B0",
+  "customize": "\u81EA\u5B9A\u4E49",
+  "customizing": "\u65B0\u5BC6\u7801\uFF088\u201364 \u4F4D\uFF0C\u82F1\u6587\u5B57\u6BCD\u6216\u6570\u5B57\uFF09\uFF1A",
   "save": "\u4FDD\u5B58",
   "cancel": "\u53D6\u6D88",
   "pinInvalid": "\u5BC6\u7801\u5FC5\u987B\u662F 8\u201364 \u4F4D\u82F1\u6587\u5B57\u6BCD\u6216\u6570\u5B57",
+  "pinCustomHint": "\u81EA\u5B9A\u4E49\u540E\u5F00\u542F\u516C\u7F51\u4E0D\u518D\u81EA\u52A8\u6362\u65B0",
+  "lanPinOff": "\u{1F513} \u5BC6\u7801\u5DF2\u5173\u95ED\uFF1A\u626B\u7801\u76F4\u8FDE\uFF0C\u65E0\u9700\u5BC6\u7801\uFF08\u4EC5\u540C\u4E00\u5C40\u57DF\u7F51\u8BBE\u5907\u53EF\u8BBF\u95EE\uFF1B\u516C\u7F51\u4ECD\u8981\u5BC6\u7801\uFF09",
   "lanStarting": "\u4EE3\u7406\u672A\u5C31\u7EEA\u2026",
   "mobileRightbar": "\u624B\u673A\u7AEF\u53F3\u8FB9\u680F",
   "mobileRightbarHint": "\u663E\u793A\u539F\u751F\u53F3\u8FB9\u680F\u5165\u53E3\uFF1B\u666E\u901A\u624B\u673A\u53EF\u6309\u9700\u5173\u95ED\uFF0C\u6298\u53E0\u5C4F\u5C55\u5F00\u540E\u4F7F\u7528\u66F4\u65B9\u4FBF",
@@ -2088,6 +2096,7 @@ var en2 = {
   "updateFailed": "\u274C Failed: {err} (manual update: dsh plugin --profile web update dsh-pocket --latest -w)",
   "versionRange": "Current v{cur} \u2192 latest v{latest}",
   "wanAccess": "Public access",
+  "pinLabel": "Access PIN",
   "modeLabel": "Address mode",
   "advAddress": "Advanced \xB7 Pick address",
   "wanOffHint": "Reachable from any network once enabled (a disclaimer is confirmed on each enable)",
@@ -2110,12 +2119,19 @@ var en2 = {
   "confirm": "Confirm",
   "lanAddress": "LAN address",
   "lanAddressAuto": "Auto (recommended)",
+  "lanPin": "LAN access PIN",
   "on": "On",
   "off": "Off",
+  "lanPinValue": "\u{1F510} PIN: {pin} (required on the phone; separate from the public PIN)",
+  "lanPinCustomValue": "\u{1F510} PIN: {pin} (custom; required on the phone)",
   "refresh": "Refresh",
+  "customize": "Customize",
+  "customizing": "New PIN (8\u201364 chars, letters/digits): ",
   "save": "Save",
   "cancel": "Cancel",
   "pinInvalid": "PIN must be 8\u201364 characters (letters and digits only)",
+  "pinCustomHint": "custom PINs are not rotated on tunnel start",
+  "lanPinOff": "\u{1F513} PIN off \u2014 scan & go, no PIN (LAN devices only; public still requires PIN)",
   "lanStarting": "Proxy starting\u2026",
   "mobileRightbar": "Mobile right sidebar",
   "mobileRightbarHint": "Show the native right-sidebar entry; disable it for a compact phone header or keep it on for an unfolded display",
@@ -2366,6 +2382,20 @@ function PocketSettingsTab({ rpcCall, t }) {
       setBusy(false);
     }
   };
+  const refreshLanPin = async () => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.lanTokenRefresh, {});
+      setStatus((s) => ({ ...s, lanToken: r.lanToken }));
+    } catch {
+    }
+  };
+  const setLanAuth = async (on) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.lanAuthSetEnabled, { on });
+      setStatus((s) => ({ ...s, lanAuthEnabled: r.lanAuthEnabled }));
+    } catch {
+    }
+  };
   const setMobileRightbar = async (on) => {
     try {
       const r = await call(POCKET_ENDPOINTS.mobileRightbarSetEnabled, { on });
@@ -2396,6 +2426,44 @@ function PocketSettingsTab({ rpcCall, t }) {
       setError(err.message);
     }
   };
+  const [customPin, setCustomPin] = (0, import_react2.useState)(null);
+  const saveCustomPin = async (which) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.pinSetCustom, { which, value: customPin?.value ?? "" });
+      setStatus((s) => ({
+        ...s,
+        accessToken: which === "public" ? r.pin : s.accessToken,
+        lanToken: which === "lan" ? r.pin : s.lanToken,
+        publicPinCustom: which === "public" ? true : s.publicPinCustom,
+        lanPinCustom: which === "lan" ? true : s.lanPinCustom
+      }));
+      setCustomPin(null);
+    } catch (err) {
+      setCustomPin((c) => ({ ...c, err: err.message }));
+    }
+  };
+  const customPinRow = (which) => (0, import_react2.createElement)(
+    "div",
+    { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)", lineHeight: 1.5 } },
+    t("customizing"),
+    (0, import_react2.createElement)("input", {
+      style: { width: 130, margin: "0 6px", padding: "4px 8px", fontSize: 14, letterSpacing: 1, textAlign: "center", border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none" },
+      type: "password",
+      minLength: 8,
+      maxLength: 64,
+      value: customPin?.value ?? "",
+      autoFocus: true,
+      onChange: (e) => setCustomPin((c) => ({ ...c, value: e.target.value.replace(/[^a-zA-Z0-9]/g, ""), err: null })),
+      onKeyDown: (e) => {
+        if (e.key === "Enter") saveCustomPin(which);
+        if (e.key === "Escape") setCustomPin(null);
+      }
+    }),
+    (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t("save")),
+    (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => setCustomPin(null) }, t("cancel")),
+    customPin?.err ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", marginTop: 4 } }, errText(customPin.err)) : null
+  );
+  const customBtn = (which) => (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12, marginLeft: 8 }, onClick: () => setCustomPin({ which, value: "", err: null }) }, t("customize"));
   const lanUrl = status?.lanUrl;
   const tunnelUrl = status?.tunnelUrl;
   const tunnelPhase = tunnelState?.phase ?? "idle";
@@ -2513,8 +2581,20 @@ function PocketSettingsTab({ rpcCall, t }) {
       status?.lanEnabled === false ? (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("lanDisabledHint")) : lanUrl ? (0, import_react2.createElement)(
         "div",
         null,
-        qrArea(status?.lanQr, lanUrl, t("lanHint")),
-        // 访问密码行已移除：反代直接暴露，不做二次认证（见 lib/index.js 的 auth 注释）。
+        qrArea(status.lanQr, lanUrl, t("lanHint")),
+        // 访问密码行：开关 + 值（关闭时提示直连）
+        row(
+          t("lanPin"),
+          Switch(status?.lanAuthEnabled !== false, () => setLanAuth(status?.lanAuthEnabled === false)),
+          status?.lanAuthEnabled === false ? (0, import_react2.createElement)("div", { style: { ...styles.muted, marginTop: 6 } }, t("lanPinOff")) : customPin?.which === "lan" ? customPinRow("lan") : (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+            (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1 } }, status.lanToken),
+            (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: refreshLanPin }, t("refresh")),
+            customBtn("lan"),
+            status?.lanPinCustom ? (0, import_react2.createElement)("span", { style: { fontSize: 11, color: "var(--dsw-alias-state-warn-primary,#b45309)" } }, t("pinCustomHint")) : null
+          )
+        ),
         // 高级：手动选地址（默认收起）
         row(
           t("advAddress"),
@@ -2640,8 +2720,23 @@ function PocketSettingsTab({ rpcCall, t }) {
             ) : null
           )
         ),
-        // 访问密码行已移除（同上：反代直通，不再做二次认证）。
-        namedMode ? (0, import_react2.createElement)("div", { style: { ...styles.warn } }, t("namedSecurity")) : null
+        // 访问密码行：值 + 自定义（自定义输入态整体替换）
+        status.accessToken ? row(
+          t("pinLabel"),
+          customPin?.which === "public" ? null : (0, import_react2.createElement)(
+            "span",
+            { style: { display: "inline-flex", alignItems: "center", gap: 8 } },
+            (0, import_react2.createElement)("span", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 13, letterSpacing: 1 } }, status.accessToken),
+            customBtn("public")
+          ),
+          (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 6 } },
+            customPin?.which === "public" ? customPinRow("public") : null,
+            status?.publicPinCustom ? (0, import_react2.createElement)("div", { style: { ...styles.warn } }, t("pinCustomHint")) : null,
+            namedMode ? (0, import_react2.createElement)("div", { style: { ...styles.warn } }, t("namedSecurity")) : null
+          )
+        ) : null
       ) : null
     ),
     (0, import_react2.createElement)(

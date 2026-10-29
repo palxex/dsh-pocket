@@ -263,7 +263,21 @@ function PocketSettingsTab({ rpcCall, t }) {
     }
   };
 
-  // 局域网访问密码的刷新/开关已移除（密码层整体下线，见 lib/index.js 的 auth 注释）。
+  // 刷新局域网访问密码（旧密码立即作废）
+  const refreshLanPin = async () => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.lanTokenRefresh, {});
+      setStatus((s) => ({ ...s, lanToken: r.lanToken }));
+    } catch { /* 忽略 */ }
+  };
+
+  // 局域网访问密码开关（issue #24）：默认开启；关闭后局域网扫码直连（公网不受影响）
+  const setLanAuth = async (on) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.lanAuthSetEnabled, { on });
+      setStatus((s) => ({ ...s, lanAuthEnabled: r.lanAuthEnabled }));
+    } catch { /* 忽略 */ }
+  };
 
   const setMobileRightbar = async (on) => {
     try {
@@ -301,7 +315,43 @@ function PocketSettingsTab({ rpcCall, t }) {
     }
   };
 
-  // 自定义访问密码（输入行 / 按钮）已移除：密码层整体下线。
+  // 自定义访问密码（issue #33）：公网/局域网各自设固定 8–64 位密码（英文字母大小写或数字）；自定义后公网不再自动轮换。
+  // customPin: { which: 'public'|'lan', value, err } | null —— 正在输入自定义密码的区块
+  const [customPin, setCustomPin] = useState(null);
+  const saveCustomPin = async (which) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.pinSetCustom, { which, value: customPin?.value ?? '' });
+      setStatus((s) => ({
+        ...s,
+        accessToken: which === 'public' ? r.pin : s.accessToken,
+        lanToken: which === 'lan' ? r.pin : s.lanToken,
+        publicPinCustom: which === 'public' ? true : s.publicPinCustom,
+        lanPinCustom: which === 'lan' ? true : s.lanPinCustom,
+      }));
+      setCustomPin(null);
+    } catch (err) {
+      setCustomPin((c) => ({ ...c, err: err.message }));
+    }
+  };
+  // 渲染自定义输入行（共用）：输入框 + 保存/取消
+  const customPinRow = (which) => h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.5 } },
+    t('customizing'),
+    h('input', {
+      style: { width: 130, margin: '0 6px', padding: '4px 8px', fontSize: 14, letterSpacing: 1, textAlign: 'center', border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none' },
+      type: 'password',
+      minLength: 8,
+      maxLength: 64,
+      value: customPin?.value ?? '',
+      autoFocus: true,
+      onChange: (e) => setCustomPin((c) => ({ ...c, value: e.target.value.replace(/[^a-zA-Z0-9]/g, ''), err: null })),
+      onKeyDown: (e) => { if (e.key === 'Enter') saveCustomPin(which); if (e.key === 'Escape') setCustomPin(null); },
+    }),
+    h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t('save')),
+    h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => setCustomPin(null) }, t('cancel')),
+    customPin?.err ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', marginTop: 4 } }, errText(customPin.err)) : null,
+  );
+  // 「自定义」按钮（非输入态显示在密码行末尾）
+  const customBtn = (which) => h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 8 }, onClick: () => setCustomPin({ which, value: '', err: null }) }, t('customize'));
 
   const lanUrl = status?.lanUrl;
   const tunnelUrl = status?.tunnelUrl;
@@ -411,8 +461,19 @@ function PocketSettingsTab({ rpcCall, t }) {
         ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-warn-primary,#b45309)', lineHeight: 1.5 } }, t('lanDisabledHint'))
         : (lanUrl
           ? h('div', null,
-            qrArea(status?.lanQr, lanUrl, t('lanHint')),
-            // 访问密码行已移除：反代直接暴露，不做二次认证（见 lib/index.js 的 auth 注释）。
+            qrArea(status.lanQr, lanUrl, t('lanHint')),
+            // 访问密码行：开关 + 值（关闭时提示直连）
+            row(t('lanPin'), Switch(status?.lanAuthEnabled !== false, () => setLanAuth(status?.lanAuthEnabled === false)),
+              status?.lanAuthEnabled === false
+                ? h('div', { style: { ...styles.muted, marginTop: 6 } }, t('lanPinOff'))
+                : (customPin?.which === 'lan'
+                  ? customPinRow('lan')
+                  : h('div', { style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                    h('span', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, letterSpacing: 1 } }, status.lanToken),
+                    h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: refreshLanPin }, t('refresh')),
+                    customBtn('lan'),
+                    status?.lanPinCustom ? h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-state-warn-primary,#b45309)' } }, t('pinCustomHint')) : null,
+                  ))),
             // 高级：手动选地址（默认收起）
             row(t('advAddress'),
               h('button', { style: { border: 'none', background: 'none', font: 'inherit', cursor: 'pointer', fontSize: 12, color: 'var(--dsw-alias-label-tertiary,#8b93a1)', padding: 0 }, onClick: () => setAdvOpen((v) => !v) },
@@ -505,8 +566,19 @@ function PocketSettingsTab({ rpcCall, t }) {
               ) : null,
             ),
           ),
-          // 访问密码行已移除（同上：反代直通，不再做二次认证）。
-          namedMode ? h('div', { style: { ...styles.warn } }, t('namedSecurity')) : null,
+          // 访问密码行：值 + 自定义（自定义输入态整体替换）
+          status.accessToken
+            ? row(t('pinLabel'),
+              customPin?.which === 'public'
+                ? null
+                : h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 8 } },
+                  h('span', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, letterSpacing: 1 } }, status.accessToken),
+                  customBtn('public')),
+              h('div', { style: { marginTop: 6 } },
+                customPin?.which === 'public' ? customPinRow('public') : null,
+                status?.publicPinCustom ? h('div', { style: { ...styles.warn } }, t('pinCustomHint')) : null,
+                namedMode ? h('div', { style: { ...styles.warn } }, t('namedSecurity')) : null))
+            : null,
         )
         : null,
     ),

@@ -779,29 +779,29 @@ test('公网隧道自动恢复：dispose（进程退出/重启）保留标记，
   await fsp.rm(home, { recursive: true, force: true });
 });
 
-test('RPC：局域网密码独立于公网；lanTokenRefresh 刷新并返回新密码（issue #18）', async () => {
+test('RPC：访问密码已移除，status 不再回传 PIN，密码类端点一律拒绝', async () => {
   const internals = stubInternals();
   const service = createPocketService({ dshPort: 3080, port: 3081, internals });
   const conn = fakeCtxConnection();
-  let lan = '11111111';
+  // 即使调用方仍按旧签名传入密码回调，也不应再被 status 回传或被端点使用。
   installPocketRpc({ connection: conn }, {
     service,
     getToken: () => '99999999',
-    getLanToken: () => lan,
-    refreshLanToken: () => { lan = '22222222'; return lan; },
+    getLanToken: () => '11111111',
+    refreshLanToken: () => '22222222',
     log: { error() {}, warn() {} },
   });
   await service.startProxy();
 
   const s = await conn.handler(POCKET_ENDPOINTS.status, {});
-  assert.equal(s.value.accessToken, '99999999', '公网密码');
-  assert.equal(s.value.lanToken, '11111111', '局域网密码独立');
+  assert.equal(s.value.accessToken, undefined, 'status 不应再回传公网密码');
+  assert.equal(s.value.lanToken, undefined, 'status 不应再回传局域网密码');
+  assert.equal(s.value.lanAuthEnabled, false, '密码开关恒为关闭，旧 bundle 不再渲染密码控件');
 
-  const r = await conn.handler(POCKET_ENDPOINTS.lanTokenRefresh, {});
-  assert.equal(r.ok, true);
-  assert.equal(r.value.lanToken, '22222222', '刷新返回新密码');
-  const s2 = await conn.handler(POCKET_ENDPOINTS.status, {});
-  assert.equal(s2.value.lanToken, '22222222', 'status 反映新密码');
+  for (const ep of [POCKET_ENDPOINTS.lanTokenRefresh, POCKET_ENDPOINTS.lanAuthSetEnabled]) {
+    const r = await conn.handler(ep, {});
+    assert.equal(r.ok, false, `${ep} 应因密码层移除而失败`);
+  }
 
   await service.dispose();
 });

@@ -154,14 +154,15 @@ test('client bundle 注入 React 绑定（PR #1 回归：mobile 组件曾 React 
   assert.ok(injectIdx !== -1 && createIdx !== -1 && injectIdx < createIdx, 'React 声明先于使用');
 });
 
-test('client bundle：status 访问必须可选链（回归：1.9.0 白屏——首次渲染 status=null 时裸 status.lanAuthEnabled 抛 TypeError）', async () => {
-  // load() 是异步的：首次渲染时 status 为 null。LAN 开关行渲染在 lanUrl 安全分支之外，
-  // 1.9.0 在这里裸访问 status.lanAuthEnabled → React 整树崩溃 → 设置页白屏。
-  // 修复：全部 status?.lanAuthEnabled。此测试防止再次出现裸访问（esbuild 会原样保留 ?.）。
+test('client bundle：status 访问必须可选链（回归：1.9.0 白屏——首次渲染 status=null 时裸访问字段抛 TypeError）', async () => {
+  // load() 是异步的：首次渲染时 status 为 null。1.9.0 在渲染 LAN 开关行时裸访问
+  // status.lanAuthEnabled → React 整树崩溃 → 设置页白屏。
+  // 密码控件虽已移除（见 lib/index.js 的 auth 注释），但「status 可能为 null」这条
+  // 前提没变，所以守卫保留：任何裸访问 status.<字段> 的形式都不允许。
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8');
-  assert.ok(!src.includes('status.lanAuthEnabled'), 'bundle 不允许裸 status.lanAuthEnabled（必须可选链）');
-  assert.ok(src.includes('status?.lanAuthEnabled'), 'bundle 存在可选链访问');
+  assert.ok(!/(?<!\.)status\.(?:lanEnabled|lanUrl|lanQr|lanToken|accessToken|lanAuthEnabled|tunnelUrl)/.test(src),
+    'bundle 不允许裸访问 status.<字段>（必须可选链）');
 });
 
 test('移动导航 backdrop（issue #38）：点击穿透不抢抽屉内点击 + 抽屉外点击关闭保留', async () => {

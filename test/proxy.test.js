@@ -684,7 +684,7 @@ test('访问令牌认证（issue #13）：公网需登录、cookie 放行、局�
   await new Promise((r) => up.close(r));
 });
 
-test('会话保持（issue #33）：登录 cookie 绑定进程 sessionKey，持久 30 天；重启后旧 cookie 失效需重新输入', async () => {
+test('会话保持（issue #33）：登录 cookie 绑定 sessionKey，期限 10 年（实质永久）；sessionKey 变化后旧 cookie 失效', async () => {
   const http = await import('node:http');
   const { createHash } = await import('node:crypto');
   const TOKEN = '12345678';
@@ -713,12 +713,12 @@ test('会话保持（issue #33）：登录 cookie 绑定进程 sessionKey，持�
   });
   try {
     const raw = makeRaw(proxy.port);
-    // 1) 登录 → cookie 派生绑定 sessionKey，且带 Max-Age（持久 30 天）
+    // 1) 登录 → cookie 派生绑定 sessionKey，且带 Max-Age（10 年，实质永久）
     const r1 = await raw({ Host: 'abc.trycloudflare.com', 'Content-Type': 'application/x-www-form-urlencoded' }, 'POST', 'token=' + TOKEN, '/pocket-login');
     assert.equal(r1.status, 302, '登录成功');
     const sc = (r1.headers['set-cookie'] || []).join(';');
     assert.ok(sc.includes('dsh_pocket_token=' + cookieOf(TOKEN, SK1)), 'cookie 绑定 sessionKey 派生');
-    assert.ok(sc.includes('Max-Age=2592000'), '持久 cookie（30 天）');
+    assert.ok(sc.includes('Max-Age=315360000'), '持久 cookie（10 年）——不再 30 天静默过期');
     assert.ok(sc.includes('HttpOnly'), 'HttpOnly');
 
     // 2) 带派生 cookie → 放行
@@ -874,16 +874,20 @@ test('登录速率限制（issue #40 改进版 A）：单 IP 失败达阈值锁�
   const proxy = await makeProxy({ windowMs: 60_000, maxFailures: 3, lockMs: 5_000, globalMaxFailures: 100, globalLockMs: 3_000 });
   const login = makeLogin(proxy.port);
   try {
-    // 1) IP-A 连续失败 3 次 → 锁定：第 4 次 429 + retry-after + 锁定文案
-    for (let i = 0; i < 3; i++) {
+    // 1) IP-A 连续失败达阈值（maxFailures=3）→ 触发的那一次自身就 429。
+    //    语义变更说明：现在先比对密码、再判锁，所以第 3 次失败即被锁（旧实现要等第 4 次）。
+    //    这样正确密码永远不会被锁挡住（见 login-recovery.test.js），而错误提交照样受限。
+    for (let i = 0; i < 2; i++) {
       const r = await login('10.0.0.1', '00000000');
       assert.equal(r.status, 200, `第 ${i + 1} 次失败返回登录页`);
       assert.ok(r.body.includes('密码错误'), '错误提示');
     }
+    const r3 = await login('10.0.0.1', '00000000');
+    assert.equal(r3.status, 429, '达到阈值即被锁 429');
+    assert.ok(String(r3.headers['retry-after'] ?? '').length > 0, '带 retry-after');
+    assert.ok(r3.body.includes('尝试次数过多'), '锁定提示文案');
     const r4 = await login('10.0.0.1', '00000000');
-    assert.equal(r4.status, 429, '超过阈值被锁 429');
-    assert.ok(String(r4.headers['retry-after'] ?? '').length > 0, '带 retry-after');
-    assert.ok(r4.body.includes('尝试次数过多'), '锁定提示文案');
+    assert.equal(r4.status, 429, '锁定期间继续 429');
 
     // 2) 不同 cf-connecting-ip 独立计数：IP-B 不受 IP-A 锁影响，可正常尝试
     const rb1 = await login('10.0.0.2', '00000000');
@@ -899,9 +903,9 @@ test('登录速率限制（issue #40 改进版 A）：单 IP 失败达阈值锁�
       assert.equal(r.status, 200, '清空后重新计数（前 2 次失败不锁）');
     }
     const rc3 = await login('10.0.0.3', '00000000');
-    assert.equal(rc3.status, 200, '第 3 次失败触发锁（本次响应仍为错误提示）');
+    assert.equal(rc3.status, 429, '第 3 次失败达到阈值即时锁定（先比对后判锁）');
     const rc4 = await login('10.0.0.3', '00000000');
-    assert.equal(rc4.status, 429, '清空后累计 3 次失败，下次请求被锁');
+    assert.equal(rc4.status, 429, '锁定期间继续 429');
   } finally {
     await proxy.close();
   }
@@ -914,8 +918,8 @@ test('登录速率限制（issue #40 改进版 A）：单 IP 失败达阈值锁�
       const r = await login2(`10.1.0.${i + 1}`, '00000000');
       assert.equal(r.status, 200, `全局第 ${i + 1} 次失败正常`);
     }
-    const r3 = await login2('10.1.0.99', '00000000'); // 第 3 个不同 IP → 触发全局锁（本次响应仍为错误提示）
-    assert.equal(r3.status, 200, '全局第 3 次失败触发锁');
+    const r3 = await login2('10.1.0.99', '00000000'); // 第 3 个不同 IP → 达到全局阈值即时锁定
+    assert.equal(r3.status, 429, '全局第 3 次失败达到阈值即时锁定（先比对后判锁）');
     const r4 = await login2('10.1.0.100', '00000000'); // 新 IP → 被全局锁拦下
     assert.equal(r4.status, 429, '新 IP 也被全局锁拦截（防换 IP 绕过）');
     assert.ok(r4.body.includes('尝试次数过多'), '全局锁提示');
@@ -966,8 +970,11 @@ test('并发登录请求在读取 body 后重新检查限速，不能批量穿�
     for (const request of pending) request.submit();
     const statuses = await Promise.all(pending.map((request) => request.response));
 
-    assert.equal(statuses.filter((status) => status === 200).length, 3, '只有阈值内的请求执行密码比较');
-    assert.equal(statuses.filter((status) => status === 429).length, 17, '其余并发请求在比较前被锁定');
+    // 语义说明（阈值顺序调整后）：现在先比对密码、再判锁，所以触发阈值的那一次
+    // 错误提交自身就会拿到 429（旧实现要等下一个请求才锁）。同一阈值下防护更早生效，
+    // 不是退化：错误提交照样被限速，且并发无法批量穿透。
+    assert.equal(statuses.filter((status) => status === 200).length, 2, '阈值内的错误提交执行密码比较');
+    assert.equal(statuses.filter((status) => status === 429).length, 18, '其余并发请求被锁定');
   } finally {
     await proxy.close();
     await new Promise((r) => up.close(r));
@@ -1426,7 +1433,7 @@ test('?token=<原始 PIN> 直达种 HttpOnly cookie，issue #35', async () => {
     const sc = Array.isArray(r1.setCookie) ? r1.setCookie.join(';') : String(r1.setCookie ?? '');
     assert.ok(sc.includes(`dsh_pocket_token=${hashed}`), `种 cookie 含哈希值（实得：${sc.slice(0, 200)}）`);
     assert.ok(sc.includes('HttpOnly'), 'HttpOnly 标记');
-    assert.ok(sc.includes('Max-Age=2592000'), '30 天持久');
+    assert.ok(sc.includes('Max-Age=315360000'), '持久 cookie（10 年，实质永久）');
 
     // 2) 用刚种的 cookie 访问子资源：200（不再依赖 ?token=）
     const r2 = await new Promise((resolve, reject) => {

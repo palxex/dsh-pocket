@@ -51,3 +51,35 @@ test('CSS 隐藏「添加工作区」图标 + 复制按钮样式（窄屏）', (
   // 复制按钮样式必须存在（窄屏才注入/显示）
   assert.ok(css.includes('[data-mobile-nav="copy-file"]'), 'mobile.css.ts 必须含复制按钮样式');
 });
+
+// 菜单 / 选择器 UI 豁免（回归测试）。
+//
+// 背景：模型选择器按钮带 aria-haspopup="menu"，各行是 role="menuitemradio"/"menuitem"，
+// 而行文案就是模型 ID（如 z-ai/glm-5.3）——命中 looksLikeFilePath 的相对路径分支
+// （`/[\w.\-]+\.\w{1,12}$` 或 `[\w.\-]+\/[\w.\-]+\.\w{1,12}`），于是：
+//   - 点击模型被拦截、弹「手机上无法直接打开电脑上的文件」；
+//   - 该行旁被注入「复制」按钮。
+// 修复：点击拦截与复制按钮注入两处都要跳过菜单/选择器 UI 内的元素。
+test('菜单/选择器 UI 内元素豁免：模型 ID 不会被当文件路径拦截或注入复制按钮', () => {
+  // 源码层面：菜单选择器存在、有 isMenuUi 判定、且两处注入点都先判 isMenuUi
+  assert.ok(src.includes("'[role=\"menuitemradio\"]'"), '必须包含 menuitemradio 选择器');
+  assert.ok(src.includes("'[aria-haspopup=\"menu\"]'"), '必须包含 aria-haspopup=menu 选择器');
+  assert.ok(src.includes('function isMenuUi'), '必须定义 isMenuUi 判定');
+  // 点击拦截点：先判 isMenuUi 再判 looksLikeFilePath
+  const onClick = src.slice(src.indexOf('const onClick = (event'), src.indexOf('const onClick = (event') + 400)
+  assert.ok(/isMenuUi\(el\)\) return/.test(onClick), '点击拦截必须先判 isMenuUi');
+  // 复制按钮注入点：也应跳过菜单内元素
+  const inject = src.slice(src.indexOf('const injectCopyButtons'), src.indexOf('const injectCopyButtons') + 700)
+  assert.ok(/isMenuUi\(/.test(inject), '复制按钮注入必须跳过菜单内元素');
+  // 行为佐证：模型 ID 形如 z-ai/glm-5.3 会命中 looksLikeFilePath 的相对路径分支
+  const m = /if \(!looksLikeFilePath\(el\.textContent\)\) return/.test(src)
+  assert.ok(m, '保留 looksLikeFilePath 判定');
+});
+
+test('模型选择器场景不注入复制按钮（行为级验证，读产物）', () => {
+  // 产物中 injectCopyButtons 必须先判 isMenuUi，避免对菜单行注入
+  const idx = bundle.indexOf('injectCopyButtons')
+  assert.ok(idx > 0, '产物必须保留 injectCopyButtons');
+  const seg = bundle.slice(idx, idx + 2200)
+  assert.ok(/isMenuUi\(/.test(seg), '复制按钮注入必须先判 isMenuUi');
+});

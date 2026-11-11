@@ -217,7 +217,7 @@ var import_react = require("react");
 var primitives2 = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
 
 // client/mobile/nav-targets.mjs
-var DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child';
+var DRAWER_SELECTOR = '[data-mobile-nav="frame"] > [data-mobile-nav-drawer]';
 var TOGGLE_SELECTOR = '[data-mobile-nav="toggle"]';
 var NAV_TARGETS = [
   "button[data-dsh-taskboard-entry]",
@@ -277,13 +277,63 @@ function MobileNavOverlay({ toggleSidebar, t }) {
     const frame = findFrame();
     if (frame === null) return;
     frame.setAttribute("data-mobile-nav", "frame");
+    const markFrameChildren = () => {
+      const isCenterTrack = (el) => el.style.gridColumnStart === "2" || getComputedStyle(el).gridColumnStart === "2";
+      const isSidebarTrack = (el) => el.style.gridColumnStart === "1" || getComputedStyle(el).gridColumnStart === "1";
+      let centerMarked = false;
+      let drawerMarked = false;
+      for (const el of Array.from(frame.children)) {
+        if (!(el instanceof HTMLElement)) continue;
+        if (el.hasAttribute("data-mobile-nav-center")) centerMarked = true;
+        if (el.hasAttribute("data-mobile-nav-drawer")) drawerMarked = true;
+        if (isSidebarTrack(el) && /^\d+(\.\d+)?px$/.test(el.style.width)) {
+          el.setAttribute("data-mobile-nav-drawer", "1");
+          drawerMarked = true;
+        }
+        if (isCenterTrack(el)) {
+          const cs = getComputedStyle(el);
+          if (cs.position === "static" && cs.display === "flex") {
+            el.setAttribute("data-mobile-nav-center", "1");
+            centerMarked = true;
+          }
+        }
+      }
+      if (!centerMarked) {
+        for (const el of Array.from(frame.children)) {
+          if (!(el instanceof HTMLElement)) continue;
+          if (!isCenterTrack(el)) continue;
+          if (getComputedStyle(el).position === "absolute") continue;
+          el.setAttribute("data-mobile-nav-center", "1");
+        }
+      }
+      if (!drawerMarked) {
+        for (const el of Array.from(frame.children)) {
+          if (!(el instanceof HTMLElement)) continue;
+          if (!el.querySelector('[role="tree"]')) continue;
+          el.setAttribute("data-mobile-nav-drawer", "1");
+          break;
+        }
+      }
+    };
+    markFrameChildren();
     const sync = () => setOpen(!frame.hasAttribute("data-sidebar-collapsed"));
     sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(frame, { attributes: true, attributeFilter: ["data-sidebar-collapsed"] });
+    const observer = new MutationObserver(() => {
+      sync();
+      markFrameChildren();
+    });
+    observer.observe(frame, {
+      attributes: true,
+      attributeFilter: ["data-sidebar-collapsed"],
+      childList: true
+    });
     return () => {
       observer.disconnect();
       frame.removeAttribute("data-mobile-nav");
+      frame.querySelectorAll("[data-mobile-nav-center],[data-mobile-nav-drawer]").forEach((el) => {
+        el.removeAttribute("data-mobile-nav-center");
+        el.removeAttribute("data-mobile-nav-drawer");
+      });
     };
   }, [mobile]);
   (0, import_react.useEffect)(() => {
@@ -831,19 +881,26 @@ var MOBILE_CSS = `
     padding-top: env(safe-area-inset-top, 0px) !important;
   }
 
-  /* \u4E3B\u5185\u5BB9\u5217\uFF08\u7B2C 2 \u4E2A\u7F51\u683C\u5B50\u5143\u7D20\uFF09\u5728\u5B98\u65B9\u6837\u5F0F\u91CC\u6709\u663E\u5F0F grid-column: 2\u2014\u2014
-     \u7F51\u683C\u88AB\u538B\u7F29\u6210 [1fr, 0, 0] \u540E\u5B83\u4F1A\u843D\u5728 0px \u7684\u7B2C 2 \u8F68\uFF0C\u6574\u4E2A\u4E3B\u754C\u9762\u88AB\u6324\u51FA
-     \u89C6\u53E3\uFF08\u53EA\u5269\u80CC\u666F\u56FE\uFF09\u3002\u5FC5\u987B\u663E\u5F0F\u628A\u5B83\u62C9\u56DE\u7B2C 1 \u8F68\uFF08issue #5\uFF09\u3002
-     \u7B2C 3 \u5217\uFF08details\uFF09\u4FDD\u6301 0 \u8F68\u5373\u53EF\uFF0C\u65E0\u9700\u5904\u7406\u3002 */
-  [data-mobile-nav="frame"] > :nth-child(2) {
+  /* \u4E3B\u5185\u5BB9\u5217\u5728\u5B98\u65B9\u6837\u5F0F\u91CC\u6709\u663E\u5F0F grid-column: 2\u2014\u2014\u7F51\u683C\u88AB\u538B\u7F29\u6210 [1fr, 0, 0] \u540E
+     \u5B83\u4F1A\u843D\u5728 0px \u7684\u7B2C 2 \u8F68\uFF0C\u6574\u4E2A\u4E3B\u754C\u9762\u88AB\u6324\u51FA\u89C6\u53E3\uFF08\u53EA\u5269\u80CC\u666F\u56FE\uFF09\u3002\u5FC5\u987B\u663E\u5F0F\u628A\u5B83
+     \u62C9\u56DE\u7B2C 1 \u8F68\uFF08issue #5\uFF09\u3002
+     \u9009\u62E9\u5668\u5386\u53F2\uFF1A\u539F\u5148\u5199 > :nth-child(2)\uFF0C\u4F9D\u8D56\u300C\u4E3B\u5185\u5BB9\u5217\u662F\u7B2C 2 \u4E2A\u5B50\u5143\u7D20\u300D\u3002
+     DSH 0.2.2 \u7684 AppFrame \u5728\u9996\u4F4D\u63D2\u5165\u4E86 drawerMask\uFF0C\u4E3B\u5185\u5BB9\u5217\u6F02\u5230\u7B2C 3 \u4E2A\u5B50\u5143\u7D20\uFF0C
+     nth-child(2) \u4E8E\u662F\u547D\u4E2D\u4FA7\u680F\u5217\uFF0C\u4E3B\u5185\u5BB9\u5217\u7559\u5728 0px \u8F68\u9053 \u2192 \u624B\u673A\u6B63\u6587\u6574\u5757\u7A7A\u767D\u3002
+     \u73B0\u6539\u4E3A\u8BA4 JS \u6253\u7684\u8BED\u4E49\u6807\u8BB0 data-mobile-nav-center\uFF08\u89C1 MobileNavOverlay.tsx\uFF09\uFF0C
+     \u4E0E\u5B50\u5143\u7D20\u987A\u5E8F\u5F7B\u5E95\u89E3\u8026\u3002\u7B2C 3 \u5217\uFF08details\uFF09\u4FDD\u6301 0 \u8F68\u5373\u53EF\uFF0C\u65E0\u9700\u5904\u7406\u3002 */
+  [data-mobile-nav="frame"] > [data-mobile-nav-center] {
     grid-column: 1 !important;
     grid-row: 1 !important;
     min-width: 0 !important;
   }
 
-  /* The sidebar column (first grid child) becomes a left drawer. The drawer
-     hugs the sidebar content exactly (the wide sidebar carries an inline
-     width, ~280px): a fixed 92vw box would leave a white strip where the
+  /* The sidebar column (marked data-mobile-nav-drawer by MobileNavOverlay's
+     semantic detection \u2014 never by grid-child order: DSH 0.2.2 inserted a
+     drawerMask as the first grid child and shifted every :first-child/:nth-child
+     selector off its target) becomes a left drawer. The drawer hugs the
+     sidebar content exactly (the wide sidebar carries an inline width,
+     ~280px): a fixed 92vw box would leave a white strip where the
      container background shows beside the content.
      Closed state: translateX(-110%) \u2014 more than -100% of the max-content
      width \u2014 guarantees the whole drawer (and its shadow, had it one) leaves
@@ -864,7 +921,7 @@ var MOBILE_CSS = `
      #67: that mask sat on top of the 600 drawer and ate every tap). Still
      far under the fixed-position banners/toasts (z 9999) that float at the
      viewport level. */
-  [data-mobile-nav="frame"] > :first-child {
+  [data-mobile-nav="frame"] > [data-mobile-nav-drawer] {
     position: absolute !important;
     inset: 0 auto 0 0 !important;
     width: max-content !important;
@@ -894,7 +951,7 @@ var MOBILE_CSS = `
      overflow:hidden drawer to scrollLeft=102, and every static child (plus the
      fixed overlay) shifts 102px off-screen. With transform:none the overlay is
      viewport-anchored: it dims the full screen and the sheet sits at left:8. */
-  [data-mobile-nav="frame"]:not([data-sidebar-collapsed]) > :first-child {
+  [data-mobile-nav="frame"]:not([data-sidebar-collapsed]) > [data-mobile-nav-drawer] {
     transform: none !important;
   }
 

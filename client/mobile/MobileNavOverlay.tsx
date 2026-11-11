@@ -61,13 +61,96 @@ export function MobileNavOverlay({ toggleSidebar, t }: MobileNavOverlayProps) {
     const frame = findFrame()
     if (frame === null) return
     frame.setAttribute('data-mobile-nav', 'frame')
+
+    // frame 直接子元素的语义标记（issue：DSH 0.2.2 起手机正文空白）。
+    //
+    // 历史：mobile.css 用 `[data-mobile-nav="frame"] > :nth-child(2)` 拉主内容列、
+    // `> :first-child` 做侧栏抽屉——都依赖「第 N 个子元素」的位置约定。
+    // DSH 0.2.2 的 AppFrame 在首位插入了 drawerMask，子元素全体右移一位：
+    //   - nth-child(2) 命中了 sidebarCol，centerCol 仍留在被压缩成 0px 的第 2 轨
+    //     → 手机上整个正文区空白（抽屉恰因官方 0.2.2 自带样式而侥幸正常）；
+    //   - :first-child 命中了 drawerMask（空遮罩），pocket 的 z-index 1200/背景等
+    //     抽屉规则全部错位——遮罩拿不到提升，侧栏靠官方 z 71 在跑，会被第三方
+    //     图层（linxin666 的 1050~1100）盖掉点击（issue #67 复发）。
+    // 修法：按「语义特征」识别并打标，CSS/JS 只认标记，与子元素顺序彻底解耦。
+    //
+    // 主内容列（两代宿主均成立、frame 内唯一）：显式落在第 2 列
+    // （grid-column-start:2）+ 文档流内（position:static）+ display:flex。
+    // 侧栏列（两代均成立、唯一）：React 以 prop 下发、渲染为内联 style.width
+    // （~280px）——其余格子都没有内联宽度。
+    const markFrameChildren = (): void => {
+      const isCenterTrack = (el: HTMLElement): boolean =>
+        el.style.gridColumnStart === '2' || getComputedStyle(el).gridColumnStart === '2'
+      const isSidebarTrack = (el: HTMLElement): boolean =>
+        el.style.gridColumnStart === '1' || getComputedStyle(el).gridColumnStart === '1'
+      let centerMarked = false
+      let drawerMarked = false
+      for (const el of Array.from(frame.children)) {
+        if (!(el instanceof HTMLElement)) continue
+        // 已带标记的直接计入：主内容列被我们的规则拉回第 1 轨后，computed
+        // grid-column-start 会变成 1，若仍按原判据扫描就会「识别不出自己改过的元素」。
+        if (el.hasAttribute('data-mobile-nav-center')) centerMarked = true
+        if (el.hasAttribute('data-mobile-nav-drawer')) drawerMarked = true
+        // 侧栏列：落在第 1 列 + 带内联像素宽度
+        if (isSidebarTrack(el) && /^\d+(\.\d+)?px$/.test(el.style.width)) {
+          el.setAttribute('data-mobile-nav-drawer', '1')
+          drawerMarked = true
+        }
+        // 主内容列：第 2 列 + static + flex
+        if (isCenterTrack(el)) {
+          const cs = getComputedStyle(el)
+          if (cs.position === 'static' && cs.display === 'flex') {
+            el.setAttribute('data-mobile-nav-center', '1')
+            centerMarked = true
+          }
+        }
+      }
+      // 兜底一（主内容列）：官方若改掉 display/position，退为「第 2 列 + 非绝对定位」。
+      if (!centerMarked) {
+        for (const el of Array.from(frame.children)) {
+          if (!(el instanceof HTMLElement)) continue
+          if (!isCenterTrack(el)) continue
+          if (getComputedStyle(el).position === 'absolute') continue
+          el.setAttribute('data-mobile-nav-center', '1')
+        }
+      }
+      // 兜底二（主内容列）：仍没认出来时，按网格「文档流内的第 2 列」再找一次；
+      // 再失败就放弃（宁可不改布局，也不能像 nth-child 漂移那样指错人）。
+      // 兜底三（侧栏列）：退为「包含会话树 [role=tree] 的格子」——抽屉宁可少一层
+      // 样式（官方抽屉仍在），不能把遮罩当抽屉打扮。
+      if (!drawerMarked) {
+        for (const el of Array.from(frame.children)) {
+          if (!(el instanceof HTMLElement)) continue
+          if (!el.querySelector('[role="tree"]')) continue
+          el.setAttribute('data-mobile-nav-drawer', '1')
+          break
+        }
+      }
+    }
+    markFrameChildren()
+
     const sync = () => setOpen(!frame.hasAttribute('data-sidebar-collapsed'))
     sync()
-    const observer = new MutationObserver(sync)
-    observer.observe(frame, { attributes: true, attributeFilter: ['data-sidebar-collapsed'] })
+    // childList：React 重渲染会替换 frame 的子元素（会话切换/面板挂载），
+    // 只观察 attributes 会漏掉新插入且未带标记的列。
+    const observer = new MutationObserver(() => {
+      sync()
+      markFrameChildren()
+    })
+    observer.observe(frame, {
+      attributes: true,
+      attributeFilter: ['data-sidebar-collapsed'],
+      childList: true,
+    })
     return () => {
       observer.disconnect()
       frame.removeAttribute('data-mobile-nav')
+      frame
+        .querySelectorAll('[data-mobile-nav-center],[data-mobile-nav-drawer]')
+        .forEach((el) => {
+          el.removeAttribute('data-mobile-nav-center')
+          el.removeAttribute('data-mobile-nav-drawer')
+        })
     }
   }, [mobile])
 

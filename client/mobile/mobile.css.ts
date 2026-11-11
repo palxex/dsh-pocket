@@ -184,19 +184,26 @@ export const MOBILE_CSS = `
     padding-top: env(safe-area-inset-top, 0px) !important;
   }
 
-  /* 主内容列（第 2 个网格子元素）在官方样式里有显式 grid-column: 2——
-     网格被压缩成 [1fr, 0, 0] 后它会落在 0px 的第 2 轨，整个主界面被挤出
-     视口（只剩背景图）。必须显式把它拉回第 1 轨（issue #5）。
-     第 3 列（details）保持 0 轨即可，无需处理。 */
-  [data-mobile-nav="frame"] > :nth-child(2) {
+  /* 主内容列在官方样式里有显式 grid-column: 2——网格被压缩成 [1fr, 0, 0] 后
+     它会落在 0px 的第 2 轨，整个主界面被挤出视口（只剩背景图）。必须显式把它
+     拉回第 1 轨（issue #5）。
+     选择器历史：原先写 > :nth-child(2)，依赖「主内容列是第 2 个子元素」。
+     DSH 0.2.2 的 AppFrame 在首位插入了 drawerMask，主内容列漂到第 3 个子元素，
+     nth-child(2) 于是命中侧栏列，主内容列留在 0px 轨道 → 手机正文整块空白。
+     现改为认 JS 打的语义标记 data-mobile-nav-center（见 MobileNavOverlay.tsx），
+     与子元素顺序彻底解耦。第 3 列（details）保持 0 轨即可，无需处理。 */
+  [data-mobile-nav="frame"] > [data-mobile-nav-center] {
     grid-column: 1 !important;
     grid-row: 1 !important;
     min-width: 0 !important;
   }
 
-  /* The sidebar column (first grid child) becomes a left drawer. The drawer
-     hugs the sidebar content exactly (the wide sidebar carries an inline
-     width, ~280px): a fixed 92vw box would leave a white strip where the
+  /* The sidebar column (marked data-mobile-nav-drawer by MobileNavOverlay's
+     semantic detection — never by grid-child order: DSH 0.2.2 inserted a
+     drawerMask as the first grid child and shifted every :first-child/:nth-child
+     selector off its target) becomes a left drawer. The drawer hugs the
+     sidebar content exactly (the wide sidebar carries an inline width,
+     ~280px): a fixed 92vw box would leave a white strip where the
      container background shows beside the content.
      Closed state: translateX(-110%) — more than -100% of the max-content
      width — guarantees the whole drawer (and its shadow, had it one) leaves
@@ -217,7 +224,7 @@ export const MOBILE_CSS = `
      #67: that mask sat on top of the 600 drawer and ate every tap). Still
      far under the fixed-position banners/toasts (z 9999) that float at the
      viewport level. */
-  [data-mobile-nav="frame"] > :first-child {
+  [data-mobile-nav="frame"] > [data-mobile-nav-drawer] {
     position: absolute !important;
     inset: 0 auto 0 0 !important;
     width: max-content !important;
@@ -247,7 +254,7 @@ export const MOBILE_CSS = `
      overflow:hidden drawer to scrollLeft=102, and every static child (plus the
      fixed overlay) shifts 102px off-screen. With transform:none the overlay is
      viewport-anchored: it dims the full screen and the sheet sits at left:8. */
-  [data-mobile-nav="frame"]:not([data-sidebar-collapsed]) > :first-child {
+  [data-mobile-nav="frame"]:not([data-sidebar-collapsed]) > [data-mobile-nav-drawer] {
     transform: none !important;
   }
 

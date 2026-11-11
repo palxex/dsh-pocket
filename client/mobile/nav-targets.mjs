@@ -2,10 +2,16 @@
 // 引入（client 侧是 esbuild 打进 bundle 的，测试里没有 DOM 可用）。
 
 /**
- * 抽屉本体：AppFrame 的第一个网格子元素，即被拉成抽屉的侧边栏列。
+ * 抽屉本体：被拉成抽屉的侧边栏列。
+ *
+ * 历史：原为 `[data-mobile-nav="frame"] > :first-child`，依赖「侧栏列是第 1 个
+ * 网格子元素」。DSH 0.2.2 在 frame 首位插入了 drawerMask，first-child 漂到了
+ * 遮罩上——「点抽屉外就关」的 contains 判定因此永远为 false，抽屉内任意点击
+ * （非导航行，如展开工作区、滚列表）都会误关抽屉。现认 JS 打的语义标记
+ * data-mobile-nav-drawer（见 MobileNavOverlay.tsx），与子元素顺序解耦。
  * @type {string}
  */
-export const DRAWER_SELECTOR = '[data-mobile-nav="frame"] > :first-child'
+export const DRAWER_SELECTOR = '[data-mobile-nav="frame"] > [data-mobile-nav-drawer]'
 
 /** 抽屉开关（会话头部那颗按钮）——点它不该被"点抽屉外就关"二次触发。 */
 export const TOGGLE_SELECTOR = '[data-mobile-nav="toggle"]'

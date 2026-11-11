@@ -84,7 +84,7 @@ test('浮层内的点击被识别为 overlay（不该关抽屉）—— issue #7
 
 test('选择器常量与 MobileNavOverlay 的用法保持一致', () => {
   const src = readFileSync(new URL('../client/mobile/MobileNavOverlay.tsx', import.meta.url), 'utf8');
-  assert.equal(DRAWER_SELECTOR, '[data-mobile-nav="frame"] > :first-child');
+  assert.equal(DRAWER_SELECTOR, '[data-mobile-nav="frame"] > [data-mobile-nav-drawer]');
   assert.equal(TOGGLE_SELECTOR, '[data-mobile-nav="toggle"]');
   assert.ok(
     src.includes("document.querySelector<HTMLElement>(DRAWER_SELECTOR)"),
@@ -126,7 +126,9 @@ test('抽屉层级压过 dsh-web-ui-all 的移动端遮罩 —— issue #67', ()
   // web-ui-all 0.3.6 的移动端响应式：sidebar pane 1100 / details pane 1000 /
   // frame ::after 全屏遮罩 1050。抽屉必须高于 1100，否则那层遮罩会盖在抽屉
   // 上吃掉每一次点击 —— 抽屉能开，但里面什么都点不动，页面也滚不了。
-  const drawerBlock = css.slice(css.indexOf('> :first-child {'));
+  // 抽屉规则现在认语义标记 data-mobile-nav-drawer（DSH 0.2.2 在 frame 首位插入
+  // drawerMask 后，first-child 漂到遮罩上，抽屉样式必须按标记匹配才打得中）。
+  const drawerBlock = css.slice(css.indexOf('> [data-mobile-nav-drawer] {'));
   const z = drawerBlock.match(/z-index:\s*(\d+)\s*!/);
   assert.ok(z, '抽屉必须显式声明 z-index !important');
   assert.ok(
@@ -232,4 +234,52 @@ test('打包产物：mobile-apply 引用的组件都有 import 且有定义', ()
     const defs = (bundle.match(new RegExp(`(?:function\\s+${name}\\b|\\b${name}\\s*=)`, 'g')) ?? []).length;
     assert.ok(defs >= 1, `${name} 在打包产物里只有引用、没有定义 —— 漏 import 会让整个插件加载失败`);
   }
+});
+
+// 位置选择器守卫（回归测试）。
+//
+// 背景：DSH 0.2.2 的 AppFrame 在 frame 首位插入 drawerMask，所有直接子元素右移一位。
+// mobile.css 原先用 :first-child（抽屉）与 :nth-child(2)（主内容列）定位，两个都命中了
+// 错误元素 —— 主内容列留在被压缩成 0px 的第 2 轨，手机上整个正文区空白（iPhone 16 实测），
+// 抽屉样式则套在了空遮罩上。
+// 修法：MobileNavOverlay 按语义特征打 data-mobile-nav-center / data-mobile-nav-drawer
+// 标记，CSS 与 JS 只认标记。此测试锁死这一点，防止以后又写回位置选择器。
+test('frame 直接子元素一律按语义标记定位，不得依赖子元素顺序', () => {
+  const css = readFileSync(new URL('../client/mobile/mobile.css.ts', import.meta.url), 'utf8');
+  const nav = readFileSync(new URL('../client/mobile/nav-targets.mjs', import.meta.url), 'utf8');
+  const overlay = readFileSync(new URL('../client/mobile/MobileNavOverlay.tsx', import.meta.url), 'utf8');
+
+  // 1) CSS 里凡针对 frame 直接子元素的选择器都不得含 :first-child / :nth-child
+  const offenders = css
+    .split('\n')
+    .filter((line) => line.includes('[data-mobile-nav="frame"]'))
+    .filter((line) => /:\s*first-child|:nth-child/.test(line))
+    .filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//'));
+  assert.deepEqual(offenders, [], `frame 子元素选择器仍依赖位置: ${offenders.join(' | ')}`);
+
+  // 2) DRAWER_SELECTOR 必须是语义标记形式
+  assert.match(DRAWER_SELECTOR, /\[data-mobile-nav-drawer\]/, 'DRAWER_SELECTOR 应认语义标记');
+
+  // 3) 两个标记都必须由 overlay 打上，且卸载时清掉（不留脏属性）
+  assert.match(overlay, /setAttribute\('data-mobile-nav-center'/, '必须打主内容列标记');
+  assert.match(overlay, /setAttribute\('data-mobile-nav-drawer'/, '必须打侧栏抽屉标记');
+  assert.match(overlay, /removeAttribute\('data-mobile-nav-center'\)/, '卸载须清中心列标记');
+  assert.match(overlay, /removeAttribute\('data-mobile-nav-drawer'\)/, '卸载须清抽屉标记');
+
+  // 4) 重渲染要重新打标：observer 必须观察 childList（React 会替换 frame 子元素）
+  assert.match(overlay, /childList:\s*true/, '必须观察 childList，否则新插入的列拿不到标记');
+
+  // 5) 判据必须包含「已标记」短路：我们自己的 CSS 会把中心列 grid-column 改成 1，
+  //    若只按 computed grid-column-start:2 扫描，重扫描会认不出自己改过的元素。
+  assert.match(overlay, /hasAttribute\('data-mobile-nav-center'\)/, '标记判定需短路，避免自指失效');
+});
+
+test('抽屉与主内容列标记的识别特征不依赖 hash 类名', () => {
+  const overlay = readFileSync(new URL('../client/mobile/MobileNavOverlay.tsx', import.meta.url), 'utf8');
+  // hash 类名（如 pI_x6G_centerCol）每次构建都变，绝不能进选择器
+  assert.ok(!/_centerCol|_sidebarCol|_drawerMask/.test(overlay), '不得按 hash 类名识别 frame 子元素');
+  // 中心列：grid 第 2 列 + static + flex；抽屉列：grid 第 1 列 + 内联像素宽度
+  assert.match(overlay, /gridColumnStart === '2'/, '中心列应认 grid 第 2 列');
+  assert.match(overlay, /gridColumnStart === '1'/, '抽屉列应认 grid 第 1 列');
+  assert.match(overlay, /style\.width/, '抽屉列的辅助判据应是内联宽度');
 });

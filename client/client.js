@@ -2100,6 +2100,8 @@ var zh2 = {
   "confirm": "\u786E\u5B9A",
   "lanAddress": "\u5C40\u57DF\u7F51\u5730\u5740",
   "lanAddressAuto": "\u81EA\u52A8\uFF08\u63A8\u8350\uFF09",
+  "lanAddressHostPlaceholder": "\u81EA\u5B9A\u4E49\u4E3B\u673A\u540D\uFF0C\u5982 home.hs.net",
+  "lanAddressHostSave": "\u767B\u8BB0",
   "lanPin": "\u5C40\u57DF\u7F51\u8BBF\u95EE\u5BC6\u7801",
   "on": "\u5F00",
   "off": "\u5173",
@@ -2194,6 +2196,8 @@ var en2 = {
   "confirm": "Confirm",
   "lanAddress": "LAN address",
   "lanAddressAuto": "Auto (recommended)",
+  "lanAddressHostPlaceholder": "Custom hostname, e.g. home.hs.net",
+  "lanAddressHostSave": "Add",
   "lanPin": "LAN access PIN",
   "on": "On",
   "off": "Off",
@@ -2501,6 +2505,7 @@ function PocketSettingsTab({ rpcCall, t }) {
       setError(err.message);
     }
   };
+  const [customHost, setCustomHost] = (0, import_react2.useState)("");
   const [customPin, setCustomPin] = (0, import_react2.useState)(null);
   const saveCustomPin = async (which) => {
     try {
@@ -2695,6 +2700,27 @@ function PocketSettingsTab({ rpcCall, t }) {
                 (0, import_react2.createElement)("option", { value: "" }, t("lanAddressAuto")),
                 (status?.lanCandidates || []).map((ip) => (0, import_react2.createElement)("option", { key: ip, value: ip }, ip))
               )
+            ),
+            (0, import_react2.createElement)(
+              "div",
+              { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } },
+              (0, import_react2.createElement)("input", {
+                type: "text",
+                placeholder: t("lanAddressHostPlaceholder"),
+                value: customHost,
+                onChange: (e) => setCustomHost(e.target.value.trim().toLowerCase().replace(/[^a-z0-9.\-]/g, "")),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter" && customHost) {
+                    setLanAddress(customHost);
+                    setCustomHost("");
+                  }
+                },
+                style: { font: "inherit", fontSize: 12, height: 28, width: 160, padding: "0 8px", borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,inherit)" }
+              }),
+              (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 28, padding: "0 10px", fontSize: 12 }, disabled: !customHost, onClick: () => {
+                setLanAddress(customHost);
+                setCustomHost("");
+              } }, t("lanAddressHostSave"))
             )
           ) : null
         )

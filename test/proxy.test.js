@@ -1129,9 +1129,23 @@ test('issue #90：Host 头不可再伪造成本机——用 TCP 源地址给声�
     policyHost(reqFrom('127.0.0.1'), 'pocket.example.com'), 'pocket.example.com',
     '自建命名隧道同理',
   );
+  // 语义更新（issue：公网 PIN 判定与用户事实脱节）：LAN 源 + public Host 的旧结论
+  // 「绝不放松」只在注入探针且隧道未运行时降级。默认不传探针 = 行为与旧版逐字节一致，
+  // 前置反代（源=LAN、Host=公网域名、隧道确实开着由 cloudflared 回连 loopback）
+  // 的公网判定路径不受影响。
   assert.equal(
     policyHost(reqFrom('192.168.1.9'), 'pocket.example.com'), 'pocket.example.com',
-    '局域网源 + 公网 Host（前置反代场景）保持公网判定，不放松',
+    '未注入探针：LAN 源 + 公网 Host 保持公网判定（旧语义不变）',
+  );
+  assert.equal(
+    policyHost(reqFrom('192.168.1.9'), 'pocket.example.com', { tunnelRunning: () => true }),
+    'pocket.example.com',
+    '隧道运行中：LAN 源 + 公网 Host 仍保持公网判定（绝不放松）',
+  );
+  assert.equal(
+    policyHost(reqFrom('192.168.1.9'), 'pocket.example.com', { tunnelRunning: () => false }),
+    '192.168.1.9',
+    '隧道未开：LAN 源 + 公网 Host（DDNS 域名回家）降级为源地址 → 局域网语义',
   );
 
   // --- 声明与来源一致时原样透传（含用户手动设置的「局域网地址」覆盖不受影响） ---
@@ -1141,13 +1155,42 @@ test('issue #90：Host 头不可再伪造成本机——用 TCP 源地址给声�
     policyHost(reqFrom(''), '127.0.0.1:3081'), '127.0.0.1:3081',
     '拿不到源地址时保持原有行为，不误伤',
   );
+
+  // --- 隧道事实例外的安全边界（issue：公网 PIN 判定脱节）---
+  assert.equal(
+    policyHost(reqFrom('203.0.113.9'), '127.0.0.1:3081', { tunnelRunning: () => false }),
+    '203.0.113.9',
+    '核心防线不受例外影响：真公网源伪造 loopback Host，即使探针关闭也照常收紧',
+  );
+  assert.equal(
+    policyHost(reqFrom('203.0.113.9'), 'pocket.example.com', { tunnelRunning: () => false }),
+    'pocket.example.com',
+    '真公网源 + 公网 Host：同级维持 Host 字面判定（公网 PIN 不变）',
+  );
+  assert.equal(
+    policyHost(reqFrom('127.0.0.1'), 'abc.trycloudflare.com', { tunnelRunning: () => true }),
+    'abc.trycloudflare.com',
+    '隧道运行中：cloudflared 回连（loopback 源）绝不降级（issue #66 原样）',
+  );
+  assert.equal(
+    policyHost(reqFrom('127.0.0.1'), 'home.hs.net:3082', { tunnelRunning: () => false }),
+    '127.0.0.1',
+    '隧道未开：本机 DDNS 域名访问的 loopback 源降级为局域网语义',
+  );
 });
 
 test('issue #90：HTTP 与 WS 两条入口都必须走 policyHost，不能只改一边', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../lib/proxy.mjs', import.meta.url), 'utf8');
-  const wired = src.match(/policyHost\(req, String\(req\.headers\.host \?\? ''\)\)/g) ?? [];
+  // 调用点带探针第三参 { tunnelRunning }（隧道事实例外，见 policyHost doc）；
+  // 守卫只锁"两处入口都过 policyHost"，不锁具体参数形状。
+  const wired = src.match(/policyHost\(req, String\(req\.headers\.host \?\? ''\)(, \{ tunnelRunning \})?\)/g) ?? [];
   assert.equal(wired.length, 2, 'createServer 与 server.on("upgrade") 各一处');
+  assert.equal(
+    (src.match(/policyHost\(req, String\(req\.headers\.host \?\? ''\), \{ tunnelRunning \}\)/g) ?? []).length,
+    2,
+    '两处入口都必须把 tunnelRunning 探针传给 policyHost（漏一边=行为不一致）',
+  );
   assert.ok(
     !/const host = String\(req\.headers\.host \?\? ''\);/.test(src),
     '不得再有直接把原始 Host 头当策略依据的入口',

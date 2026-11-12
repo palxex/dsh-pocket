@@ -68,14 +68,22 @@ test('手机端右边栏默认开启，可关闭并持久化', () => withHome(as
   assert.equal(setMobileRightbarEnabled(true), true, '可再次开启');
 }));
 
-test('局域网地址覆盖：默认自动，设置/清除持久化，非法 IPv4 拒绝', () => withHome(async () => {
+test('局域网地址覆盖：默认自动，设置/清除持久化（IPv4 与域名），非法值拒绝', () => withHome(async () => {
   const { lanIpOverride, setLanIpOverride, settingsPath } = await import('../lib/settings.mjs');
   assert.equal(lanIpOverride(), '', '默认自动');
   assert.equal(setLanIpOverride('100.119.24.44'), '100.119.24.44', '设置成功');
   assert.equal(lanIpOverride(), '100.119.24.44', '立即生效');
   const raw = JSON.parse(readFileSync(settingsPath(), 'utf8'));
   assert.equal(raw.lanIpOverride, '100.119.24.44', 'settings.json 内容正确');
-  assert.throws(() => setLanIpOverride('999.1.1.1'), /IPv4/, '非法地址拒绝');
+  assert.throws(() => setLanIpOverride('999.1.1.1'), /IPv4|主机名/, '非法地址拒绝');
+  assert.throws(() => setLanIpOverride('bad host!'), /IPv4|主机名/, '含空格/非法字符拒绝');
+  // DDNS 域名（issue：公网 PIN 判定脱节）：#79 救济通道原先只收 IPv4，
+  // 被 classifyHost 判成公网的域名用户无法登记——现在主机名同样合法。
+  assert.equal(setLanIpOverride('home.hs.net'), 'home.hs.net', '域名登记成功');
+  assert.equal(lanIpOverride(), 'home.hs.net', '域名立即生效');
+  assert.equal(setLanIpOverride('HOME.HS.NET'), 'home.hs.net', '大小写归一');
+  assert.equal(lanIpOverride(), 'home.hs.net', '归一后存储');
+  assert.throws(() => setLanIpOverride('999.1.1'), /IPv4|主机名/, '四段以下的纯数字点分形态按 IPv4 意图拒绝');
   assert.equal(setLanIpOverride(''), '', '清除覆盖');
   assert.equal(lanIpOverride(), '', '恢复自动');
 }));

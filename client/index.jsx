@@ -315,6 +315,9 @@ function PocketSettingsTab({ rpcCall, t }) {
     }
   };
 
+  // 高级地址行的自定义主机名输入（DDNS 域名登记，issue：公网 PIN 判定脱节）
+  const [customHost, setCustomHost] = useState('');
+
   // 自定义访问密码（issue #33）：公网/局域网各自设固定 8–64 位密码（英文字母大小写或数字）；自定义后公网不再自动轮换。
   // customPin: { which: 'public'|'lan', value, err } | null —— 正在输入自定义密码的区块
   const [customPin, setCustomPin] = useState(null);
@@ -489,6 +492,17 @@ function PocketSettingsTab({ rpcCall, t }) {
                   h('option', { value: '' }, t('lanAddressAuto')),
                   (status?.lanCandidates || []).map((ip) => h('option', { key: ip, value: ip }, ip)),
                   ),
+                ),
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 } },
+                  h('input', {
+                    type: 'text',
+                    placeholder: t('lanAddressHostPlaceholder'),
+                    value: customHost,
+                    onChange: (e) => setCustomHost(e.target.value.trim().toLowerCase().replace(/[^a-z0-9.\-]/g, '')),
+                    onKeyDown: (e) => { if (e.key === 'Enter' && customHost) { setLanAddress(customHost); setCustomHost(''); } },
+                    style: { font: 'inherit', fontSize: 12, height: 28, width: 160, padding: '0 8px', borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'var(--dsw-alias-label-primary,inherit)' },
+                  }),
+                  h('button', { style: { ...styles.btn, height: 28, padding: '0 10px', fontSize: 12 }, disabled: !customHost, onClick: () => { setLanAddress(customHost); setCustomHost(''); } }, t('lanAddressHostSave')),
                 ),
               ) : null),
           )

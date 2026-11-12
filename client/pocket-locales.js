@@ -1,4 +1,4 @@
-// dsh-pocket 设置页签 i18n 词典（与 client/mobile/locales.ts 同款：zh 为源真，en 为译文）。
+// dsh-pocket 设置页签 i18n 词典（zh 为源真，en 为译文）。
 // 需要新增字符串时：先加到 zh（key-set 唯一来源），再补 en（key 必须与 zh 完全一致）。
 export const NS = 'pocket'
 
@@ -65,8 +65,6 @@ export const zh = {
   'pinCustomHint': '自定义后开启公网不再自动换新',
   'lanPinOff': '🔓 密码已关闭：扫码直连，无需密码（仅同一局域网设备可访问；公网仍要密码）',
   'lanStarting': '代理未就绪…',
-  'mobileRightbar': '手机端右边栏',
-  'mobileRightbarHint': '显示原生右边栏入口；普通手机可按需关闭，折叠屏展开后使用更方便',
   'wanTitle': '🌐 公网（人在外面）',
   'wanHint': '任何网络扫码即用（URL 每次重启自动换新）',
   'wanPin': '🔐 访问密码：{pin}（每次开启公网变新；手机打开链接需输入此密码）',
@@ -163,8 +161,6 @@ export const en = {
   'pinCustomHint': 'custom PINs are not rotated on tunnel start',
   'lanPinOff': '🔓 PIN off — scan & go, no PIN (LAN devices only; public still requires PIN)',
   'lanStarting': 'Proxy starting…',
-  'mobileRightbar': 'Mobile right sidebar',
-  'mobileRightbarHint': 'Show the native right-sidebar entry; disable it for a compact phone header or keep it on for an unfolded display',
   'wanTitle': '🌐 Anywhere (public)',
   'wanHint': 'Scan from any network (the URL changes on every restart)',
   'wanPin': '🔐 PIN: {pin} (changes each time the tunnel is enabled; required on the phone)',

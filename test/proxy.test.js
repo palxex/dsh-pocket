@@ -645,11 +645,13 @@ test('访问令牌认证（issue #13）：公网需登录、cookie 放行、局�
   const r4 = await raw({ ...publicH, 'Content-Type': 'application/x-www-form-urlencoded' }, 'POST', 'token=' + TOKEN, '/pocket-login');
   assert.equal(r4.status, 302, '正确密码重定向');
   const sc = (r4.headers['set-cookie'] || []).join(';');
-  assert.ok(sc.includes('dsh_pocket_token=' + TOKEN), '种 HttpOnly cookie');
+  // cookie 名带监听端口后缀（多实例同域共存，见 proxy.mjs 的 cookieNameFor）
+  const CK = 'dsh_pocket_token_' + proxy.port;
+  assert.ok(sc.includes(CK + '=' + TOKEN), '种 HttpOnly cookie（名字含端口后缀）');
   assert.ok(sc.includes('HttpOnly'), 'HttpOnly');
 
   // 5) 带 cookie → 放行
-  const r5 = await raw({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: 'dsh_pocket_token=' + TOKEN });
+  const r5 = await raw({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: CK + '=' + TOKEN });
   assert.equal(r5.status, 200, '带 cookie 放行');
   assert.ok(r5.body.includes('dsh'), '内容正常');
 
@@ -660,7 +662,7 @@ test('访问令牌认证（issue #13）：公网需登录、cookie 放行、局�
   assert.match(r6.body, /id="current-password"[^>]+autocomplete="current-password"/, '长期有效的 LAN PIN 允许密码管理器填充');
   assert.match(r6.body, /id="pocket-username"[^>]+autocomplete="username"[^>]+value="dsh-pocket"/, '固定 PIN 提供稳定的隐式账号供密码管理器关联');
   // 局域网带 cookie → 放行
-  const r6b = await raw({ ...lanH, Cookie: 'dsh_pocket_token=' + TOKEN });
+  const r6b = await raw({ ...lanH, Cookie: CK + '=' + TOKEN });
   assert.equal(r6b.status, 200, '局域网带 cookie 放行');
 
   // 7) WS：未认证 → 拒绝
@@ -717,16 +719,17 @@ test('会话保持（issue #33）：登录 cookie 绑定 sessionKey，期限 10 
     const r1 = await raw({ Host: 'abc.trycloudflare.com', 'Content-Type': 'application/x-www-form-urlencoded' }, 'POST', 'token=' + TOKEN, '/pocket-login');
     assert.equal(r1.status, 302, '登录成功');
     const sc = (r1.headers['set-cookie'] || []).join(';');
-    assert.ok(sc.includes('dsh_pocket_token=' + cookieOf(TOKEN, SK1)), 'cookie 绑定 sessionKey 派生');
+    const CK = 'dsh_pocket_token_' + proxy.port;
+    assert.ok(sc.includes(CK + '=' + cookieOf(TOKEN, SK1)), 'cookie 绑定 sessionKey 派生');
     assert.ok(sc.includes('Max-Age=315360000'), '持久 cookie（10 年）——不再 30 天静默过期');
     assert.ok(sc.includes('HttpOnly'), 'HttpOnly');
 
     // 2) 带派生 cookie → 放行
-    const r2 = await raw({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: 'dsh_pocket_token=' + cookieOf(TOKEN, SK1) }, 'GET', undefined, '/api/hello');
+    const r2 = await raw({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: CK + '=' + cookieOf(TOKEN, SK1) }, 'GET', undefined, '/api/hello');
     assert.equal(r2.status, 200, '正确 cookie 放行');
 
     // 3) 旧格式 cookie（= PIN 本身）不再放行（升级后旧登录失效，需重新输入）
-    const r3 = await raw({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: 'dsh_pocket_token=' + TOKEN }, 'GET', undefined, '/api/hello');
+    const r3 = await raw({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: CK + '=' + TOKEN }, 'GET', undefined, '/api/hello');
     assert.equal(r3.status, 401, '裸 PIN cookie 已失效');
 
     // 4) 模拟 dsh web 重启（新 sessionKey）→ 旧 cookie 失效，需重新登录；新会话 cookie 放行
@@ -738,9 +741,10 @@ test('会话保持（issue #33）：登录 cookie 绑定 sessionKey，期限 10 
     });
     try {
       const raw2 = makeRaw(proxy2.port);
-      const r4 = await raw2({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: 'dsh_pocket_token=' + cookieOf(TOKEN, SK1) }, 'GET', undefined, '/api/hello');
+      const CK2 = 'dsh_pocket_token_' + proxy2.port;
+      const r4 = await raw2({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: CK2 + '=' + cookieOf(TOKEN, SK1) }, 'GET', undefined, '/api/hello');
       assert.equal(r4.status, 401, '重启后旧 cookie 失效（需重新输入）');
-      const r5 = await raw2({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: 'dsh_pocket_token=' + cookieOf(TOKEN, SK2) }, 'GET', undefined, '/api/hello');
+      const r5 = await raw2({ Host: 'abc.trycloudflare.com', Accept: 'application/json', Cookie: CK2 + '=' + cookieOf(TOKEN, SK2) }, 'GET', undefined, '/api/hello');
       assert.equal(r5.status, 200, '新会话 cookie 放行');
     } finally {
       await proxy2.close();
@@ -1474,13 +1478,14 @@ test('?token=<原始 PIN> 直达种 HttpOnly cookie，issue #35', async () => {
     });
     assert.equal(r1.status, 200, '主页 200');
     const sc = Array.isArray(r1.setCookie) ? r1.setCookie.join(';') : String(r1.setCookie ?? '');
-    assert.ok(sc.includes(`dsh_pocket_token=${hashed}`), `种 cookie 含哈希值（实得：${sc.slice(0, 200)}）`);
+    const CK = `dsh_pocket_token_${proxy.port}`;
+    assert.ok(sc.includes(`${CK}=${hashed}`), `种 cookie 含哈希值（实得：${sc.slice(0, 200)}）`);
     assert.ok(sc.includes('HttpOnly'), 'HttpOnly 标记');
     assert.ok(sc.includes('Max-Age=315360000'), '持久 cookie（10 年，实质永久）');
 
     // 2) 用刚种的 cookie 访问子资源：200（不再依赖 ?token=）
     const r2 = await new Promise((resolve, reject) => {
-      const req = http.request({ host: '127.0.0.1', port: proxy.port, path: '/assets/x.js', headers: { Host: 'x:3081', Cookie: `dsh_pocket_token=${hashed}` } }, (res) => {
+      const req = http.request({ host: '127.0.0.1', port: proxy.port, path: '/assets/x.js', headers: { Host: 'x:3081', Cookie: `${CK}=${hashed}` } }, (res) => {
         res.resume(); res.on('end', () => resolve(res.statusCode));
       });
       req.on('error', reject); req.end();

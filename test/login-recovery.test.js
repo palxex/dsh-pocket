@@ -50,5 +50,7 @@ test('错误提交仍计入限速（穷举防线不得被削弱）', () => {
 test('登录页含陈旧 cookie 自愈脚本（可删除坏 cookie）', () => {
   const page = src.slice(src.indexOf('function loginPageHtml'), src.indexOf('function loginPageHtml') + 9000);
   assert.match(page, /Max-Age=0/, '登录页应能把坏 cookie 置为过期');
-  assert.match(page, /dsh_pocket_token/, '自愈脚本应针对 pocket 会话 cookie');
+  // cookie 名现在是 ${cookieName} 插值（带端口后缀），不再写死字面量
+  assert.match(page, /function loginPageHtml\([^)]*cookieName[^)]*\)/, 'loginPageHtml 应接收 cookieName 参数');
+  assert.match(page, /document\.cookie=.\$\{cookieName\}=/, '自愈脚本应删除本次会话对应的 cookie 名');
 });

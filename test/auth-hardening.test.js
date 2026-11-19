@@ -98,7 +98,7 @@ async function withAuthProxy(fn) {
     req.end();
   });
   try {
-    await fn({ login, getWithCookie, MAIN, ALT, SESSION_KEY });
+    await fn({ login, getWithCookie, MAIN, ALT, SESSION_KEY, cookieName: `dsh_pocket_token_${proxy.port}` });
   } finally {
     await proxy.close();
     await new Promise((r) => up.close(r));
@@ -111,14 +111,19 @@ function expectedCookie(token, sessionKey) {
 }
 
 test('登录（POST /pocket-login）：主密码与替代令牌都能登录，且种下对应的会话 cookie', async () => {
-  await withAuthProxy(async ({ login, getWithCookie, MAIN, ALT, SESSION_KEY }) => {
+  await withAuthProxy(async ({ login, getWithCookie, MAIN, ALT, SESSION_KEY, cookieName }) => {
     // 1) 替代令牌（临时 PIN 钩子）登录：此前只与主 PIN 明文 `===` 比较，替代令牌被挡
     const rAlt = await login(ALT);
     assert.equal(rAlt.status, 302, '替代令牌登录成功（302 回首页）');
     const setCookie = String(rAlt.headers['set-cookie'] ?? '');
     assert.ok(setCookie.includes(expectedCookie(ALT, SESSION_KEY)), 'cookie 绑定替代令牌而非主 PIN');
-    const withAlt = await getWithCookie(`dsh_pocket_token=${expectedCookie(ALT, SESSION_KEY)}`);
+    // 断言必须看到上游内容而非登录页：认证失败时代理返回 200 + 登录页，
+    // 只判 status===200 会假阳性（登录页也是 200）。
+    const withAlt = await getWithCookie(`${cookieName}=${expectedCookie(ALT, SESSION_KEY)}`);
     assert.equal(withAlt.status, 200, '替代令牌的 cookie 可正常访问');
+    // 判据用 dsh</body> 子串：pocket 会在 <head> 后注入脚本，把完整的
+    // <html><head></head><body>dsh 字面量截断，整串匹配会假失败。
+    assert.ok(withAlt.body.includes('dsh</body>'), '放行到上游，而非登录页');
 
     // 2) 主密码照常可用
     const rMain = await login(MAIN);

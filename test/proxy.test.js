@@ -1263,6 +1263,23 @@ test('upstreamPathWithLaunchToken（issue #77）：首屏根路径补 token，�
     `/?dsh-pocket-auth=1&token=${TOK}`, '带强制标记时无视旧 cookie');
 });
 
+test('upstreamPathWithLaunchToken（多实例串台）：只认本实例的 dsh-auth cookie，别的实例的 cookie 不算已握手', async () => {
+  const { upstreamPathWithLaunchToken, dshAuthCookieNameForTest } = await import('../lib/proxy.mjs');
+  const TOK = 'launch-token-for-instance';
+  // 本实例 upstream 127.0.0.1:3080 的 cookie 名；另一实例 127.0.0.1:60051 的 cookie 名
+  const mine = dshAuthCookieNameForTest({ host: '127.0.0.1', port: 3080 });
+  const other = dshAuthCookieNameForTest({ host: '127.0.0.1', port: 60051 });
+  // 带着别的实例的 dsh-auth cookie → 必须补 token（否则本实例上游 authority 不匹配 → 401 → 被顶回 auth 页）
+  assert.equal(upstreamPathWithLaunchToken('/', 'GET', `${other}=somevalue`, TOK, mine),
+    `/?token=${TOK}`, '别的实例的 dsh-auth cookie 不算本实例已握手');
+  // 带着本实例的 cookie → 不补（防 303 循环）
+  assert.equal(upstreamPathWithLaunchToken('/', 'GET', `${mine}=somevalue`, TOK, mine),
+    '/', '本实例 cookie 视为已握手');
+  // 本实例 cookie 存在但空值 → 算未握手，补 token
+  assert.equal(upstreamPathWithLaunchToken('/', 'GET', `${mine}=`, TOK, mine),
+    `/?token=${TOK}`, '空值 cookie 不算已握手');
+});
+
 // ---------- 清理历史遗留的 dsh-desktop-* 参数（issue #75） ----------
 
 test('stripDesktopMarkers（issue #75）：URL 上的 dsh-desktop-* 参数全部清掉，其余原样', async () => {
@@ -1334,14 +1351,17 @@ test('端到端（issue #75）：代理转发前清掉 dsh-desktop-*，上游拿
 
 test('端到端（issue #77 + #91）：代理自动补 token 完成会话握手——首屏过渡页下发 cookie，之后正常返回首页', async () => {
   const http = await import('node:http');
+  const { dshAuthCookieNameForTest } = await import('../lib/proxy.mjs');
   const TOK = 'launch-token-abc123';
   const seen = [];
+  // 先建端口未定的 upstream，cookie 名在 listen 后按真实端口确定（与 pocket 算法一致）
+  let AUTH_COOKIE = 'dsh-auth-pending';
   // 模拟新版 dsh web 的浏览器会话认证：/?token= → 303 + Set-Cookie；有 cookie → 首页；否则 401
   const upstream = http.createServer((req, res) => {
     seen.push(req.url);
     const u = new URL(req.url ?? '/', 'http://x');
     if (u.pathname === '/' && u.searchParams.get('token') === TOK) {
-      res.writeHead(303, { location: '/', 'set-cookie': 'dsh-auth-abc=1; Path=/; HttpOnly; SameSite=Strict' });
+      res.writeHead(303, { location: '/', 'set-cookie': `${AUTH_COOKIE}=1; Path=/; HttpOnly; SameSite=Strict` });
       res.end();
       return;
     }
@@ -1354,6 +1374,7 @@ test('端到端（issue #77 + #91）：代理自动补 token 完成会话握手�
     res.end('dsh web authentication required; reopen the URL printed by dsh web');
   });
   await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  AUTH_COOKIE = dshAuthCookieNameForTest({ host: '127.0.0.1', port: upstream.address().port });
   const proxy = await createPocketProxy({
     port: 0, host: '127.0.0.1', upstream: { host: '127.0.0.1', port: upstream.address().port },
     injectHtml: '', launchToken: () => TOK,
@@ -1374,7 +1395,7 @@ test('端到端（issue #77 + #91）：代理自动补 token 完成会话握手�
     assert.ok(seen.some((u) => u.includes(`token=${TOK}`)), '上游确实收到了启动 token');
 
     // 浏览器带着 cookie 再访问：不再补 token → 直接拿到首页（不会循环）
-    const second = await fetch(`${base}/`, { redirect: 'manual', headers: { host: 'abc.trycloudflare.com', cookie: 'dsh-auth-abc=1' } });
+    const second = await fetch(`${base}/`, { redirect: 'manual', headers: { host: 'abc.trycloudflare.com', cookie: `${AUTH_COOKIE}=1` } });
     assert.equal(second.status, 200, '带 cookie 直接返回首页');
     assert.match(await second.text(), /index/, '首页内容正确');
     assert.ok(!seen[seen.length - 1].includes('token='), '带 cookie 的请求不再补 token（防循环）');
